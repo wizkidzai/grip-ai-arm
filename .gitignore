@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+__pycache__/
+# Calibration measured on one specific pair of arms (stays on that computer)
+tools/hand_calibration.json
+tools/calibration.json
