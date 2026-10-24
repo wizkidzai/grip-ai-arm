@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// Node's `process` (no @types/node in this project, so declare just what we use).
+declare const process: { env: Record<string, string | undefined> };
+
 export default defineConfig({
   plugins: [react()],
   // Hosted under a sub-path (e.g. https://<user>.github.io/grip-ai-arm/): set GRIP_BASE=/grip-ai-arm/.
