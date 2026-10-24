@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Hosted under a sub-path (e.g. https://<user>.github.io/grip-ai-arm/): set GRIP_BASE=/grip-ai-arm/.
+  base: process.env.GRIP_BASE ?? '/',
   // Pre-bundle lazily loaded deps. Otherwise the dev server reloads the page the
   // first time the Code tab opens, which would drop the USB connection to the arm.
   optimizeDeps: {
