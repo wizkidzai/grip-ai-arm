@@ -2,7 +2,7 @@ import * as Blockly from 'blockly/core';
 import { GRIPPER, JOINTS, JointId } from '../arm/joints';
 import { POSES, PoseName } from '../arm/poses';
 import { SpeedName } from '../arm/safety';
-import { Program, Stmt } from './program';
+import { Program, SoundName, Stmt } from './program';
 
 /** Scratch-like category colours. */
 export const COLORS = {
@@ -13,7 +13,16 @@ export const COLORS = {
   control: '#FFAB19',
   speed: '#CF63CF',
   ai: '#2EAD5A',
+  surprise: '#FF6680',
+  talk: '#9966FF',
 };
+
+const SOUND_OPTIONS = [
+  ['🔔 beep', 'beep'],
+  ['🎉 cheer', 'cheer'],
+  ['🦘 boing', 'boing'],
+  ['💨 whoosh', 'whoosh'],
+];
 
 const JOINT_OPTIONS = JOINTS.filter((_, i) => i !== GRIPPER).map((j) => [`${j.icon} ${j.name}`, j.id]);
 const POSE_OPTIONS = (Object.keys(POSES) as PoseName[]).map((k) => [POSES[k].label, k]);
@@ -66,6 +75,96 @@ export function defineBlocks() {
       ...stmt,
       colour: COLORS.move,
       tooltip: 'Turn a joint a little bit more from where it is now. Use a minus number to go the other way.',
+    },
+    {
+      type: 'grip_move_many',
+      message0: 'move base %1 ° shoulder %2 ° elbow %3 °',
+      args0: [
+        { type: 'field_number', name: 'BASE', value: 0, min: -180, max: 180, precision: 1 },
+        { type: 'field_number', name: 'SHOULDER', value: 0, min: -180, max: 180, precision: 1 },
+        { type: 'field_number', name: 'ELBOW', value: 0, min: -180, max: 180, precision: 1 },
+      ],
+      ...stmt,
+      colour: COLORS.move,
+      tooltip: 'Move three joints at the same time.',
+    },
+    {
+      type: 'grip_glide',
+      message0: 'glide %1 to %2 ° in %3 seconds',
+      args0: [
+        { type: 'field_dropdown', name: 'JOINT', options: JOINT_OPTIONS },
+        { type: 'field_number', name: 'VALUE', value: 45, min: -180, max: 180, precision: 1 },
+        { type: 'field_number', name: 'SECONDS', value: 2, min: 0.2, max: 10, precision: 0.1 },
+      ],
+      ...stmt,
+      colour: COLORS.move,
+      tooltip: 'Move smoothly so the joint arrives in this many seconds (it never goes faster than the safe limit).',
+    },
+    {
+      type: 'grip_nod',
+      message0: 'nod yes 🙂',
+      ...stmt,
+      colour: COLORS.move,
+    },
+    {
+      type: 'grip_shake',
+      message0: 'shake no 🙃',
+      ...stmt,
+      colour: COLORS.move,
+    },
+    {
+      type: 'grip_wiggle',
+      message0: 'wiggle wrist %1 times',
+      args0: [{ type: 'field_number', name: 'TIMES', value: 3, min: 1, max: 10, precision: 1 }],
+      ...stmt,
+      colour: COLORS.move,
+    },
+    {
+      type: 'grip_random_move',
+      message0: 'move %1 to a random angle from %2 to %3 °',
+      args0: [
+        { type: 'field_dropdown', name: 'JOINT', options: JOINT_OPTIONS },
+        { type: 'field_number', name: 'MIN', value: -30, min: -180, max: 180, precision: 1 },
+        { type: 'field_number', name: 'MAX', value: 30, min: -180, max: 180, precision: 1 },
+      ],
+      ...stmt,
+      colour: COLORS.surprise,
+      tooltip: 'A surprise every time you press Go!',
+    },
+    {
+      type: 'grip_chance',
+      message0: 'maybe (%1 % chance)',
+      args0: [{ type: 'field_number', name: 'PERCENT', value: 50, min: 0, max: 100, precision: 1 }],
+      message1: '%1',
+      args1: [{ type: 'input_statement', name: 'DO' }],
+      ...stmt,
+      colour: COLORS.surprise,
+      tooltip: 'Runs the blocks inside only sometimes. 50% means about half of the time.',
+    },
+    {
+      type: 'grip_wait_random',
+      message0: 'wait a random %1 to %2 seconds',
+      args0: [
+        { type: 'field_number', name: 'MIN', value: 0.5, min: 0, max: 10, precision: 0.1 },
+        { type: 'field_number', name: 'MAX', value: 2, min: 0, max: 10, precision: 0.1 },
+      ],
+      ...stmt,
+      colour: COLORS.surprise,
+    },
+    {
+      type: 'grip_say',
+      message0: 'say %1',
+      args0: [{ type: 'field_input', name: 'TEXT', text: "Hello! I'm Pip!" }],
+      ...stmt,
+      colour: COLORS.talk,
+      tooltip: 'Pip says this out loud (no names or addresses please!).',
+    },
+    {
+      type: 'grip_sound',
+      message0: 'play sound %1',
+      args0: [{ type: 'field_dropdown', name: 'SOUND', options: SOUND_OPTIONS }],
+      ...stmt,
+      colour: COLORS.talk,
     },
     {
       type: 'grip_home',
@@ -164,7 +263,16 @@ export const TOOLBOX = {
       kind: 'category',
       name: 'Move',
       colour: COLORS.move,
-      contents: [block('grip_move'), block('grip_turn'), block('grip_home')],
+      contents: [
+        block('grip_move'),
+        block('grip_turn'),
+        block('grip_move_many'),
+        block('grip_glide'),
+        block('grip_nod'),
+        block('grip_shake'),
+        block('grip_wiggle'),
+        block('grip_home'),
+      ],
     },
     { kind: 'category', name: 'Poses', colour: COLORS.poses, contents: [block('grip_pose')] },
     {
@@ -180,6 +288,13 @@ export const TOOLBOX = {
       contents: [block('grip_wait'), block('grip_repeat'), block('grip_forever')],
     },
     { kind: 'category', name: 'Speed', colour: COLORS.speed, contents: [block('grip_speed')] },
+    {
+      kind: 'category',
+      name: 'Surprise',
+      colour: COLORS.surprise,
+      contents: [block('grip_random_move'), block('grip_chance'), block('grip_wait_random')],
+    },
+    { kind: 'category', name: 'Talk & sound', colour: COLORS.talk, contents: [block('grip_say'), block('grip_sound')] },
     { kind: 'category', name: 'AI', colour: COLORS.ai, contents: [block('grip_skill')] },
   ],
 };
@@ -266,6 +381,26 @@ export function workspaceToProgram(ws: Blockly.Workspace): ConvertResult {
         return { kind: 'forever', id, body: readChain(b.getInputTargetBlock('DO')) };
       case 'grip_skill':
         return { kind: 'skill', id, task: String(b.getFieldValue('TASK') ?? '') };
+      case 'grip_move_many':
+        return { kind: 'moveMany', id, base: num(b, 'BASE'), shoulder: num(b, 'SHOULDER'), elbow: num(b, 'ELBOW') };
+      case 'grip_glide':
+        return { kind: 'glide', id, joint: b.getFieldValue('JOINT') as JointId, value: num(b, 'VALUE'), seconds: num(b, 'SECONDS') };
+      case 'grip_nod':
+        return { kind: 'nod', id };
+      case 'grip_shake':
+        return { kind: 'shake', id };
+      case 'grip_wiggle':
+        return { kind: 'wiggle', id, times: num(b, 'TIMES') };
+      case 'grip_random_move':
+        return { kind: 'randomMove', id, joint: b.getFieldValue('JOINT') as JointId, min: num(b, 'MIN'), max: num(b, 'MAX') };
+      case 'grip_chance':
+        return { kind: 'chance', id, percent: num(b, 'PERCENT'), body: readChain(b.getInputTargetBlock('DO')) };
+      case 'grip_wait_random':
+        return { kind: 'waitRandom', id, min: num(b, 'MIN'), max: num(b, 'MAX') };
+      case 'grip_say':
+        return { kind: 'say', id, text: String(b.getFieldValue('TEXT') ?? '') };
+      case 'grip_sound':
+        return { kind: 'sound', id, sound: b.getFieldValue('SOUND') as SoundName };
       default:
         errors.push({ blockId: id, message: 'This block cannot go here.' });
         return null;
@@ -340,6 +475,19 @@ export const STARTERS: Record<string, { label: string; hint: string; state: obje
       b('grip_pose', { POSE: 'reach' }),
       b('grip_open'),
       b('grip_home'),
+    ]),
+  },
+  surprise: {
+    label: '🎲 Surprise show',
+    hint: 'Press Go a few times. Is the show different every time?',
+    state: program([
+      b('grip_say', { TEXT: 'Watch my surprise show!' }),
+      b('grip_nod'),
+      b('grip_random_move', { JOINT: 'shoulder_pan', MIN: -40, MAX: 40 }),
+      b('grip_chance', { PERCENT: 50 }, [b('grip_wiggle', { TIMES: 2 }), b('grip_sound', { SOUND: 'boing' })]),
+      b('grip_glide', { JOINT: 'shoulder_pan', VALUE: 0, SECONDS: 2 }),
+      b('grip_sound', { SOUND: 'cheer' }),
+      b('grip_say', { TEXT: 'Ta-da!' }),
     ]),
   },
   blank: {

@@ -28,6 +28,7 @@ from teleop import HAND, IDS, NAMES, Bus, check_power, find_arms  # noqa: E402
 
 OUT = Path(__file__).with_name("calibration.json")
 HAND_OUT = Path(__file__).with_name("hand_calibration.json")
+WRIST_OUT = Path(__file__).with_name("wrist_limits.json")
 ADDR_MIN_LIMIT, ADDR_HOMING, ADDR_TORQUE, ADDR_GOAL, ADDR_LOCK = 9, 31, 40, 42, 55
 HALF_TURN = 2047
 GRIP_SQUEEZE = 35  # ticks past "jaw tips touch" so the follower can hold things (~10 % effort)
@@ -142,6 +143,9 @@ def main():
     )
     pause(15, "Hold the follower in the middle pose.")
     f_mid = clear_and_home(follower)
+    if WRIST_OUT.exists():
+        WRIST_OUT.unlink()  # old camera-safe range no longer matches the new middle
+        print("    removed old wrist_limits.json: run teleop.py --set-wrist-limits again")
     hold(follower)
     say("Got it! The follower is holding its pose. You can let go.")
     print("    follower middle:", f_mid)

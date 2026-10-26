@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { Episode } from './ai/episodes';
 import { SavedPolicy } from './ai/policy';
 import { ArmRole } from './arm/arm';
@@ -9,6 +9,10 @@ import { CalibrationWizard } from './ui/CalibrationWizard';
 import { CameraView } from './ui/CameraView';
 import { ConnectPanel, SimLeaderSliders } from './ui/ConnectPanel';
 import { DrivePanel } from './ui/DrivePanel';
+import { Academy, LearnProgress, MissionBanner, lessonById, loadProgress, saveProgress } from './learn/Academy';
+import { CheckId, LESSONS, Lesson } from './learn/lessons';
+import { AppContext, TeacherCall } from './teacher/TeacherCall';
+import { SettingsPanel } from './ui/SettingsPanel';
 import { TeachPanel } from './ui/TeachPanel';
 import { RunPanel, TrainPanel } from './ui/TrainPanel';
 import { JointReadout, useConfirm } from './ui/common';
@@ -24,6 +28,7 @@ const TABS = [
   { id: 'teach', icon: '🪞', label: 'Teach' },
   { id: 'train', icon: '🧠', label: 'Train' },
   { id: 'run', icon: '🚀', label: 'Try it' },
+  { id: 'settings', icon: '⚙️', label: 'Settings' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -54,6 +59,75 @@ export default function App() {
   const [highlight, setHighlight] = useState<number | null>(null);
   const { telemetry, notice, setNotice } = robot;
 
+  // ---- GRIP Academy ("Teach me"): story, classes and missions ----
+  const [learn, setLearnState] = useState<LearnProgress>(loadProgress);
+  const [academyOpen, setAcademyOpen] = useState(false);
+  const [academyStart, setAcademyStart] = useState<string | null>(null);
+  const [checks, setChecks] = useState<Set<CheckId>>(new Set());
+  const baseline = useRef({ episodes: 0, skills: 0 });
+  const prevMode = useRef(telemetry.mode);
+  const setLearn = (p: LearnProgress) => {
+    setLearnState(p);
+    saveProgress(p);
+  };
+  const mission = lessonById(learn.active);
+  const tick = (c: CheckId) => setChecks((s) => (s.has(c) ? s : new Set(s).add(c)));
+  const stop = () => {
+    robot.stop();
+    tick('stopPressed');
+  };
+  const startMission = (lesson: Lesson) => {
+    baseline.current = { episodes: episodes.length, skills: skills.length };
+    setChecks(new Set());
+    setLearn({ ...learn, active: lesson.id });
+    setAcademyOpen(false);
+    setTab(lesson.mission.tab);
+  };
+  // Watch what the learner does, so mission steps tick themselves off.
+  useEffect(() => {
+    if (!mission) return;
+    if (robot.slots.follower.status === 'ready') tick('followerReady');
+    if (telemetry.mode === 'drive') tick('drove');
+    if (telemetry.mode === 'teleop') tick('copied');
+    if (prevMode.current === 'program' && telemetry.mode === 'idle' && /program finished/i.test(notice?.text ?? '')) tick('programFinished');
+    if (prevMode.current === 'skill' && telemetry.mode === 'idle') tick('skillRun');
+    if (episodes.length > baseline.current.episodes) tick('recorded');
+    if (skills.length > baseline.current.skills) tick('trained');
+    prevMode.current = telemetry.mode;
+  });
+  const missionComplete = !!mission && mission.mission.steps.every((s) => checks.has(s.check));
+  useEffect(() => {
+    if (mission && missionComplete && !learn.done.includes(mission.id)) {
+      setLearn({ ...learn, done: [...learn.done, mission.id] });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionComplete]);
+  const nextLesson = mission ? LESSONS[LESSONS.indexOf(mission) + 1] ?? null : null;
+
+  // ---- Live class with Ms. Nova (AI teacher) ----
+  const [callOpen, setCallOpen] = useState(false);
+  const armText = (role: 'leader' | 'follower') => {
+    const s = robot.slots[role];
+    if (s.status !== 'ready') return s.status === 'none' ? 'not connected' : s.status;
+    const kind = s.bus?.kind === 'sim' ? 'pretend arm' : 'real arm';
+    return role === 'follower' ? `${kind}, motors ${robot.motorsOn ? 'on' : 'off'}` : kind;
+  };
+  const teacherContext: AppContext = {
+    level: learn.level ?? 'explorer',
+    tab,
+    leader: armText('leader'),
+    follower: armText('follower'),
+    mode: telemetry.mode,
+    mission: mission
+      ? `class ${LESSONS.indexOf(mission) + 1} "${mission.title}": ${mission.mission.steps
+          .map((s) => `${s.text} (${checks.has(s.check) ? 'done' : 'to do'})`)
+          .join(', ')}`
+      : '',
+    demos: episodes.length,
+    brains: skills.length,
+    lastMessage: notice?.text ?? '',
+  };
+
   const setTab = (t: TabId) => {
     setTabState(t);
     try {
@@ -77,7 +151,7 @@ export default function App() {
   // Escape is a keyboard STOP, anywhere on the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') robot.stop();
+      if (e.key === 'Escape') stop();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -113,7 +187,20 @@ export default function App() {
           {MODE_TEXT[telemetry.mode]}
           {telemetry.recording && ' · ⏺ rec'}
         </p>
-        <button className="stop" onClick={robot.stop} aria-keyshortcuts="Escape" title="Stop everything (Esc)">
+        <button className="btn live-class" onClick={() => setCallOpen(true)} title="Join a live class with Ms. Nova, the AI teacher">
+          📹 <span className="label">Live class</span>
+        </button>
+        <button
+          className="btn primary teach-me"
+          onClick={() => {
+            setAcademyStart(null);
+            setAcademyOpen(true);
+          }}
+          title="Learn how to use the app, step by step"
+        >
+          🎓 <span className="label">Teach me</span>
+        </button>
+        <button className="stop" onClick={stop} aria-keyshortcuts="Escape" title="Stop everything (Esc)">
           <span aria-hidden="true">✋</span> STOP
         </button>
       </header>
@@ -133,6 +220,27 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {mission && (
+        <MissionBanner
+          lesson={mission}
+          checks={checks}
+          complete={missionComplete}
+          onOpenAcademy={() => {
+            setAcademyStart(null);
+            setAcademyOpen(true);
+          }}
+          onNext={
+            nextLesson
+              ? () => {
+                  setAcademyStart(nextLesson.id);
+                  setAcademyOpen(true);
+                }
+              : null
+          }
+          onClose={() => setLearn({ ...learn, active: null })}
+        />
+      )}
 
       {notice && (
         <div className={`notice ${notice.kind}`} role={notice.kind === 'warn' ? 'alert' : 'status'}>
@@ -165,8 +273,18 @@ export default function App() {
               {tab === 'teach' && (
                 <TeachPanel robot={robot} episodes={episodes} setEpisodes={setEpisodes} confirm={confirm} />
               )}
-              {tab === 'train' && <TrainPanel robot={robot} episodes={episodes} skills={skills} setSkills={setSkills} />}
+              {tab === 'train' && <TrainPanel robot={robot} episodes={episodes} skills={skills} setSkills={setSkills} confirm={confirm} />}
               {tab === 'run' && <RunPanel robot={robot} skills={skills} confirm={confirm} />}
+              {tab === 'settings' && (
+                <SettingsPanel
+                  robot={robot}
+                  episodes={episodes}
+                  setEpisodes={setEpisodes}
+                  skills={skills}
+                  setSkills={setSkills}
+                  confirm={confirm}
+                />
+              )}
             </>
           )}
         </div>
@@ -177,6 +295,20 @@ export default function App() {
         </aside>
       </main>
       {dialog}
+      {academyOpen && (
+        <Academy
+          progress={learn}
+          setProgress={setLearn}
+          startWith={academyStart}
+          onClose={() => setAcademyOpen(false)}
+          onStartMission={startMission}
+          onJoinCall={() => {
+            setAcademyOpen(false);
+            setCallOpen(true);
+          }}
+        />
+      )}
+      {callOpen && <TeacherCall context={teacherContext} onLeave={() => setCallOpen(false)} />}
     </div>
   );
 }

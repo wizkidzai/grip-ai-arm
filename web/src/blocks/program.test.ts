@@ -161,3 +161,93 @@ describe('ProgramRunner', () => {
     expect(s.message).toMatch(/3 minutes/);
   });
 });
+
+describe('new blocks', () => {
+  const seeded = (vals: number[]) => {
+    let i = 0;
+    return () => vals[i++ % vals.length];
+  };
+
+  it('compiles nod, shake, wiggle, move-many, glide, say and sound', () => {
+    const r = compile(
+      prog(
+        { kind: 'nod', id: 'n' },
+        { kind: 'shake', id: 's' },
+        { kind: 'wiggle', id: 'w', times: 2 },
+        { kind: 'moveMany', id: 'm', base: 10, shoulder: 20, elbow: -30 },
+        { kind: 'glide', id: 'g', joint: 'elbow_flex', value: 40, seconds: 3 },
+        { kind: 'say', id: 'y', text: 'Hello!' },
+        { kind: 'sound', id: 'b', sound: 'cheer' },
+      ),
+      limits,
+    );
+    expect(r.errors).toEqual([]);
+    expect(r.commands.map((c) => c.op)).toEqual([
+      'moveBy', 'moveBy', 'moveBy', 'moveBy', // nod
+      'moveBy', 'moveBy', 'moveBy', // shake
+      'moveBy', 'moveBy', 'moveBy', 'moveBy', // wiggle x2
+      'move', 'moveTimed', 'say', 'sound',
+    ]);
+    expect(r.commands[11]).toMatchObject({ set: [10, 20, -30, null, null, null] });
+  });
+
+  it('nod and shake end where they started', () => {
+    const { commands } = compile(prog({ kind: 'nod', id: 'n' }, { kind: 'shake', id: 's' }), limits);
+    const sum = [0, 0, 0, 0, 0, 0];
+    for (const c of commands) if (c.op === 'moveBy') c.by.forEach((v, i) => (sum[i] += v));
+    expect(sum).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it('surprise blocks use the random source and stay inside the given range', () => {
+    const r = compile(
+      prog(
+        { kind: 'randomMove', id: 'r', joint: 'shoulder_pan', min: -40, max: 40 },
+        { kind: 'chance', id: 'c', percent: 50, body: [{ kind: 'sound', id: 'x', sound: 'boing' }] },
+        { kind: 'waitRandom', id: 'w', min: 1, max: 3 },
+      ),
+      limits,
+      [],
+      seeded([0.75, 0.9, 0.5]), // random angle 20, chance fails (90 >= 50), wait 2 s
+    );
+    expect(r.commands[0]).toMatchObject({ op: 'move', set: [20, null, null, null, null, null] });
+    expect(r.commands.map((c) => c.op)).toEqual(['move', 'wait']);
+    expect(r.commands[1]).toMatchObject({ seconds: 2 });
+    const yes = compile(prog({ kind: 'chance', id: 'c', percent: 50, body: [{ kind: 'nod', id: 'n' }] }), limits, [], seeded([0.1]));
+    expect(yes.commands.length).toBe(4);
+  });
+
+  it('gives friendly errors for bad new blocks', () => {
+    const r = compile(
+      prog(
+        { kind: 'moveMany', id: 'm', base: 0, shoulder: 0, elbow: 500 },
+        { kind: 'glide', id: 'g', joint: 'elbow_flex', value: 10, seconds: 60 },
+        { kind: 'wiggle', id: 'w', times: 99 },
+        { kind: 'randomMove', id: 'r', joint: 'shoulder_pan', min: 30, max: -30 },
+        { kind: 'say', id: 'y', text: '   ' },
+        { kind: 'sound', id: 'b', sound: 'explosion' as never },
+      ),
+      limits,
+    );
+    expect(r.errors.map((e) => e.blockId)).toEqual(['m', 'g', 'w', 'r', 'y', 'b']);
+  });
+
+  it('glide picks a speed that arrives on time but never above the fast limit', () => {
+    const { commands } = compile(prog({ kind: 'glide', id: 'g', joint: 'shoulder_pan', value: 60, seconds: 4 }), limits);
+    const runner = new ProgramRunner(commands, limits, () => null);
+    const s = runner.step([...HOME] as Joints, 0);
+    expect(s.maxSpeed).toBeCloseTo(15, 0); // 60 deg in 4 s
+    const fast = compile(prog({ kind: 'glide', id: 'g', joint: 'shoulder_pan', value: 100, seconds: 0.2 }), limits);
+    expect(new ProgramRunner(fast.commands, limits, () => null).step([...HOME] as Joints, 0).maxSpeed).toBe(150);
+  });
+
+  it('say sends a speak event once and waits for the words', () => {
+    const { commands } = compile(prog({ kind: 'say', id: 'y', text: 'one two three four five' }, { kind: 'nod', id: 'n' }), limits);
+    const runner = new ProgramRunner(commands, limits, () => null);
+    const first = runner.step([...HOME] as Joints, 0);
+    expect(first.events).toEqual([{ say: 'one two three four five' }]);
+    expect(first.blockId).toBe('y');
+    expect(runner.step([...HOME] as Joints, 500).events).toBeUndefined();
+    expect(runner.step([...HOME] as Joints, 600).blockId).toBe('y'); // still saying it
+    expect(runner.step([...HOME] as Joints, 3000).blockId).toBe('n'); // then nods
+  });
+});

@@ -5,3 +5,8 @@ __pycache__/
 # Calibration measured on one specific pair of arms (stays on that computer)
 tools/hand_calibration.json
 tools/calibration.json
+tools/wrist_limits.json
+web/server/voice/.venv/
+web/server/voice/*.onnx
+web/server/voice/*.bin
+web/studio/build/

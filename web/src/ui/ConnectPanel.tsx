@@ -1,6 +1,6 @@
-import { useReducer } from 'react';
+import { useReducer, useState } from 'react';
 import { ArmRole } from '../arm/arm';
-import { JOINTS } from '../arm/joints';
+import { JOINTS, WRIST_ROLL } from '../arm/joints';
 import { SimBus } from '../drivers/simBus';
 import { webSerialSupported } from '../drivers/serialBus';
 import { Ask, Robot } from './useRobot';
@@ -111,6 +111,7 @@ function ArmCard({
               )}
             </div>
           )}
+          {role === 'follower' && !isSim && <WristSafeSetup robot={robot} />}
           <div className="row small">
             {!isSim && (
               <button className="btn link" onClick={() => robot.recalibrate(role)}>
@@ -169,5 +170,87 @@ export function SimLeaderSliders({ robot }: { robot: Robot }) {
         ))}
       </div>
     </section>
+  );
+}
+
+/** Keep this many degrees inside each measured end of the camera-safe wrist range. */
+const WRIST_SAFE_MARGIN = 5;
+
+/**
+ * Measure, by hand, how far the follower's wrist may spin before its camera ends up
+ * underneath (where it can hit the table or snap its cable).
+ */
+function WristSafeSetup({ robot }: { robot: Robot }) {
+  const [step, setStep] = useState<'idle' | 'end1' | 'end2'>('idle');
+  const [end1, setEnd1] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const now = robot.telemetry.follower?.[WRIST_ROLL];
+  const safe = robot.wristSafe;
+
+  const begin = async () => {
+    setError(null);
+    if (robot.motorsOn) await robot.setMotors(false); // so the wrist can be turned by hand
+    setStep('end1');
+  };
+  const save1 = () => {
+    if (now === undefined) return setError("We can't read the wrist right now. Check the follower is connected.");
+    setEnd1(now);
+    setStep('end2');
+  };
+  const save2 = () => {
+    if (now === undefined || end1 === null) return;
+    const lo = Math.min(end1, now) + WRIST_SAFE_MARGIN;
+    const hi = Math.max(end1, now) - WRIST_SAFE_MARGIN;
+    if (hi - lo < 20) {
+      setError('Those two ends are very close together. Turn the wrist further each way (only as far as is safe!), then try again.');
+      setStep('end1');
+      return;
+    }
+    robot.setWristSafe({ min: lo, max: hi });
+    setStep('idle');
+  };
+
+  return (
+    <div className="wrist-safe">
+      <p className={safe ? 'ok' : 'warn-text'}>
+        📷 Camera-safe wrist spin:{' '}
+        {safe ? `${Math.round(safe.min)}° to ${Math.round(safe.max)}°` : 'not set yet'}
+      </p>
+      {step === 'idle' && (
+        <div className="row">
+          <button className="btn small" onClick={begin}>
+            {safe ? 'Set it again' : 'Set it'}
+          </button>
+          {safe && (
+            <button className="btn link" onClick={() => robot.setWristSafe(null)}>
+              Remove limit
+            </button>
+          )}
+        </div>
+      )}
+      {step !== 'idle' && (
+        <div className="callout">
+          <p>
+            <strong>Step {step === 'end1' ? 1 : 2} of 2:</strong> The follower's motors are off, so hold the arm.
+            Turn the <strong>wrist spin</strong> by hand {step === 'end1' ? 'one way' : 'the other way'}, only as far as
+            the camera is still safe (not underneath, cable not tight). Then press Save.
+          </p>
+          <p className="hint">Wrist spin now: {now === undefined ? '…' : `${Math.round(now)}°`}</p>
+          <div className="row">
+            <button className="btn primary" onClick={step === 'end1' ? save1 : save2}>
+              Save
+            </button>
+            <button className="btn link" onClick={() => setStep('idle')}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {error && (
+        <p className="callout warn" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

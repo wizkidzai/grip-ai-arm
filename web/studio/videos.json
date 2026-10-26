@@ -1,0 +1,117 @@
+{
+  "voices": { "nova": "af_heart", "maya": "af_sky" },
+  "videos": [
+    {
+      "id": "connect",
+      "title": "Connect your robot arms",
+      "subtitle": "Pretend arms, real arms, and the STOP button",
+      "tab": "connect",
+      "outro": "Arms connected!",
+      "lines": [
+        { "maya": "Hi Ms. Nova! I just got my robot arms. How do I start?" },
+        { "nova": "Hi Maya! Welcome to GRIP. Your kit has two arms. The leader is the one you move with your hand, and the follower copies you." },
+        { "maya": "Can I try it without plugging anything in?" },
+        { "nova": "Yes! Click Use a pretend arm on the leader card, and then on the follower card.",
+          "do": [{ "click": { "card": 0, "name": "Use a pretend arm" } }, { "click": { "card": 1, "name": "Use a pretend arm" } }] },
+        { "maya": "Cool, both arms are connected!" },
+        { "nova": "With real arms, you click Connect both arms and pick the USB ports instead. Now turn on the follower's motors.",
+          "do": [{ "click": { "name": "Turn motors on" } }] },
+        { "maya": "What's the big red button at the top?", "do": [{ "point": { "css": ".stop" } }] },
+        { "nova": "That's STOP. If anything looks wrong, press STOP, or the Escape key. Robot rule number one: hands clear, then press go!",
+          "do": [{ "click": { "css": ".stop" } }] },
+        { "maya": "Got it! Hands clear, then go." }
+      ]
+    },
+    {
+      "id": "drive",
+      "title": "Drive Pip",
+      "subtitle": "Poses, joints and the hand",
+      "tab": "drive",
+      "setup": [{ "click": { "name": "Use a pretend arm" } }],
+      "outro": "You can drive Pip!",
+      "lines": [
+        { "maya": "How do I make Pip move?" },
+        { "nova": "Open the Drive tab and try a pose button. Let's press Wave up!", "do": [{ "click": { "name": "Wave up" } }] },
+        { "maya": "It waved! I can see it in the 3D view, too." },
+        { "nova": "Each joint has its own card. Press plus to turn it ten degrees. Zero is the middle.",
+          "do": [{ "click": { "name": "Base spin plus 10 degrees" } }, { "click": { "name": "Base spin plus 10 degrees" } }] },
+        { "maya": "Can I open the hand?" },
+        { "nova": "Press Open, then Close. In real life, only grab soft and light things.",
+          "do": [{ "click": { "name": "Open", "exact": false } }, { "wait": 900 }, { "click": { "name": "Close", "exact": false } }] },
+        { "maya": "And Home puts it back?", "do": [{ "click": { "name": "Home" } }] },
+        { "nova": "Exactly! Start on slow speed while you practice. You're a robot pilot now." }
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code with blocks",
+      "subtitle": "Make Pip do a whole show by itself",
+      "tab": "code",
+      "setup": [{ "click": { "name": "Try it on a pretend arm" } }],
+      "outro": "You coded Pip!",
+      "lines": [
+        { "maya": "Can I make Pip do a whole show by itself?" },
+        { "nova": "Yes, with code! Blocks snap together like puzzle pieces, and Pip runs them from top to bottom." },
+        { "nova": "This program makes Pip wave. Press Go, and watch which block lights up.", "do": [{ "click": { "css": ".btn.go" } }] },
+        { "maya": "The block lights up while it runs!", "do": [{ "wait": 2500 }] },
+        { "nova": "Now pick Surprise show from Start from, and press Go again.",
+          "do": [{ "select": { "css": ".code-toolbar select", "value": "surprise" } }, { "wait": 600 }, { "click": { "css": ".btn.go" } }] },
+        { "maya": "Pip talks and plays sounds! Is it different every time?" },
+        { "nova": "Yes! The Surprise blocks pick random numbers. Press Show me the code to see the same program written in Python.",
+          "do": [{ "click": { "name": "Show me the code", "exact": false } }] },
+        { "maya": "Whoa, real code! I'm a programmer." }
+      ]
+    },
+    {
+      "id": "teach",
+      "title": "Teach Pip by showing",
+      "subtitle": "Copy me and recording demos",
+      "tab": "connect",
+      "setup": [
+        { "click": { "card": 0, "name": "Use a pretend arm" } },
+        { "click": { "card": 1, "name": "Use a pretend arm" } },
+        { "click": { "name": "Turn motors on" } },
+        { "click": { "css": ".tab:nth-child(4)" } }
+      ],
+      "outro": "You taught Pip!",
+      "lines": [
+        { "maya": "Can Pip learn from me?" },
+        { "nova": "Yes! Press Start Copy me. When you move the leader arm, the follower copies you.",
+          "do": [{ "click": { "name": "Start \"Copy me\"", "exact": false } }] },
+        { "nova": "With pretend arms, these sliders are your hand on the leader. Let's turn the base.",
+          "do": [{ "slide": { "css": ".sliders input[type=range]", "index": 0, "key": "ArrowRight", "times": 30 } }] },
+        { "maya": "It copies me, like a mirror!" },
+        { "nova": "Now record a demo. Press Record, move slowly, then press Save.",
+          "do": [
+            { "click": { "name": "⏺ Record", "exact": false } },
+            { "slide": { "css": ".sliders input[type=range]", "index": 0, "key": "ArrowLeft", "times": 30 } },
+            { "click": { "name": "💾 Save", "exact": false } }
+          ] },
+        { "maya": "I saved my first demo!" },
+        { "nova": "Great job! Record five demos of the same task, starting from the same spot, so the robot brain can learn it." }
+      ]
+    },
+    {
+      "id": "train",
+      "title": "Train a robot brain",
+      "subtitle": "Learning from demos, then testing like a scientist",
+      "tab": "connect",
+      "seedDemos": 3,
+      "setup": [
+        { "click": { "card": 1, "name": "Use a pretend arm" } },
+        { "click": { "name": "Turn motors on" } }
+      ],
+      "outro": "You trained a robot brain!",
+      "lines": [
+        { "maya": "I recorded three demos of a wave. What now?" },
+        { "nova": "Open the Train tab and press Start learning. Pip's brain practices guessing the next move.",
+          "do": [{ "click": { "css": ".tab:nth-child(5)" } }, { "click": { "name": "Start learning", "exact": false } }] },
+        { "maya": "The line is going down!" },
+        { "nova": "That line shows the mistakes. Lower is better. Now open Try it, and press Go.",
+          "do": [{ "click": { "css": ".tab:nth-child(6)" } }, { "click": { "name": "🚀 Go!", "exact": false } }] },
+        { "maya": "Pip did it all by itself!" },
+        { "nova": "It did! Now test it ten times and count the wins, like a real scientist. That's how engineers make robots better." }
+      ]
+    }
+  ]
+}

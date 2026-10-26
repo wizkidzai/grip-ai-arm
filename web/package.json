@@ -8,9 +8,12 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "teacher": "node server/teacher.mjs",
+    "videos": "cd studio && ../server/voice/.venv/bin/python tts.py && node record.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "@react-three/fiber": "8.18.0",
     "blockly": "12.5.1",
     "react": "18.3.1",
@@ -23,6 +26,7 @@
     "@types/three": "0.169.0",
     "@types/w3c-web-serial": "1.0.7",
     "@vitejs/plugin-react": "4.3.4",
+    "playwright-core": "1.48.2",
     "typescript": "5.6.3",
     "vite": "5.4.21",
     "vitest": "2.1.9"

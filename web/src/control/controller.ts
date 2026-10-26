@@ -3,7 +3,7 @@ import { GRIPPER, JOINTS, Joints } from '../arm/joints';
 import { SPEEDS, SpeedName, StallDetector, clampTarget, effectiveLimits } from '../arm/safety';
 import { Episode, FPS, Frame, actionAt, compactFrame, episodeDuration } from '../ai/episodes';
 import { Skill } from '../ai/policy';
-import { ProgramRunner } from '../blocks/runner';
+import { ProgramEvent, ProgramRunner } from '../blocks/runner';
 
 export type Mode = 'idle' | 'teleop' | 'replay' | 'skill' | 'program' | 'drive';
 
@@ -31,6 +31,8 @@ export interface ControllerEvents {
   onAutoStop: (message: string) => void;
   /** A problem worth showing that did NOT stop anything (used in "Copy me"). */
   onWarning?: (message: string) => void;
+  /** A block program wants to say something or play a sound. */
+  onProgramEvent?: (e: ProgramEvent) => void;
 }
 
 /** The leader's thumb "catches" the follower's hand when within this many percent. */
@@ -296,6 +298,7 @@ export class Controller {
     if (follower && this.lastFollower && this.mode !== 'idle') {
       const present = this.lastFollower;
       let speed = this.speed;
+      let programMaxSpeed: number | undefined;
       let target: Joints | null = null;
       const elapsed = (now - this.modeStart) / 1000;
 
@@ -354,12 +357,14 @@ export class Controller {
         } else {
           target = step.target;
           speed = step.speed;
+          programMaxSpeed = step.maxSpeed;
+          step.events?.forEach((e) => this.events.onProgramEvent?.(e));
         }
       }
 
       if (target) {
         displayTarget = clampTarget(target, follower.limits, present);
-        goal = await follower.stepToward(target, present, SPEEDS[speed], dt);
+        goal = await follower.stepToward(target, present, Math.min(programMaxSpeed ?? SPEEDS[speed], SPEEDS.fast), dt);
         if (this.recording) {
           const t = (now - this.recordStart) / 1000;
           if (t <= MAX_RECORD_SECONDS) {

@@ -10,6 +10,7 @@ and nothing jumps when it starts.
     python3 tools/teleop.py --relax          # just turn the follower's motors off
     python3 tools/teleop.py --leader /dev/ttyACM0 --follower /dev/ttyACM1   # say which is which
     python3 tools/teleop.py --calibrate-hand # measure trigger + jaw open/closed (10 seconds)
+    python3 tools/teleop.py --set-wrist-limits  # camera-safe wrist spin range, measured by hand
 
 The hand copies directly (trigger let go = jaw open, squeezed = jaw closed) using
 tools/hand_calibration.json, because on the SO-101 kit the leader's trigger and the
@@ -125,6 +126,35 @@ class Bus:
 
 HAND_FILE = Path(__file__).with_name("hand_calibration.json")
 CAL_FILE = Path(__file__).with_name("calibration.json")  # written by tools/calibrate.py
+WRIST_FILE = Path(__file__).with_name("wrist_limits.json")
+WRIST = 4  # wrist spin (wrist_roll)
+WRIST_MARGIN = 55  # ticks (~5 deg) kept inside each measured end
+
+
+def load_wrist():
+    """Camera-safe wrist spin range in raw ticks, or None."""
+    try:
+        w = json.loads(WRIST_FILE.read_text())
+        lo, hi = sorted((int(w["min"]), int(w["max"])))
+        return (lo, hi) if hi - lo >= 200 else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def set_wrist_limits(follower):
+    follower.torque(False)
+    print("The follower's motors are OFF: hold the arm.")
+    input("1) Turn the follower's WRIST SPIN by hand one way, only as far as the camera is still safe. Then press Enter.")
+    a = follower.positions()[WRIST]
+    input("2) Now turn it the OTHER way, only as far as is safe. Then press Enter.")
+    b = follower.positions()[WRIST]
+    lo, hi = sorted((a, b))
+    lo, hi = lo + WRIST_MARGIN, hi - WRIST_MARGIN
+    if hi - lo < 200:
+        sys.exit("Those ends are very close together. Run --set-wrist-limits again and turn further each way.")
+    WRIST_FILE.write_text(json.dumps({"min": lo, "max": hi}, indent=2) + "\n")
+    print(f"Saved {WRIST_FILE.name}: wrist spin stays between {lo} and {hi} "
+          f"({(hi - lo) * 360 / 4096:.0f} deg). The follower will never spin past this.")
 HAND_CATCH_TICKS = 80  # the thumb "catches" the jaw within this distance
 HAND_MOVE_TICKS = 150  # ...or once the thumb moves this much (~13 deg) from where it started
 STUCK_TICKS = 200  # a joint this far behind its goal is blocked (~18 deg)
@@ -234,6 +264,7 @@ def main():
     ap.add_argument("--leader", help="leader's port, e.g. /dev/ttyACM0 (default: auto-detect by voltage)")
     ap.add_argument("--follower", help="follower's port, e.g. /dev/ttyACM1")
     ap.add_argument("--debug-hand", action="store_true", help="print trigger / jaw goal / jaw actual 4x per second")
+    ap.add_argument("--set-wrist-limits", action="store_true", help="measure the camera-safe wrist spin range, then exit")
     ap.add_argument("--calibrate-hand", action="store_true", help="measure trigger/jaw open and closed, then exit")
     args = ap.parse_args()
 
@@ -251,6 +282,12 @@ def main():
     if args.calibrate_hand:
         calibrate_hand(leader, follower)
         return
+    if args.set_wrist_limits:
+        set_wrist_limits(follower)
+        return
+    wrist = load_wrist()
+    print("Wrist spin: " + (f"camera-safe range {wrist[0]}..{wrist[1]}" if wrist
+                            else "NO camera-safe limit (run --set-wrist-limits if there is a wrist camera)"))
     hand = load_hand()
     ranges = load_ranges()
     print("Hand: " + ("copies directly (trigger -> jaw)" if hand else "copies changes (run --calibrate-hand for best results)"))
@@ -314,6 +351,10 @@ def main():
                 target = max(lo + RANGE_MARGIN, min(hi - RANGE_MARGIN, lead[k])) if hi - lo > 2 * RANGE_MARGIN else goal[k]
             else:
                 target = foll0[k] + (lead[k] - lead0[k])
+            if k == WRIST and wrist:
+                if not wrist[0] <= target <= wrist[1]:
+                    foll0[k] += max(wrist[0], min(wrist[1], target)) - target  # no dead zone at the limit
+                target = max(wrist[0], min(wrist[1], target))
             target = max(0, min(4095, target))
             limit = step if t - start > SOFT_START_S else SOFT_START_SPEED / 360 * 4096 / hz
             goal[k] += max(-limit, min(limit, target - goal[k]))
