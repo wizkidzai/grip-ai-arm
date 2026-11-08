@@ -301,6 +301,19 @@ h3 {
 .panel-head .hint {
   margin: 0;
 }
+.keyboard-help {
+  margin-top: 6px;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.keyboard-help summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.keyboard-help ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
 
 .card {
   background: var(--surface);

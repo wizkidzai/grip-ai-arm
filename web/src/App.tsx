@@ -148,13 +148,14 @@ export default function App() {
     storage.saveSkills(s);
   };
 
-  // Escape is a keyboard STOP, anywhere on the page.
+  // Escape is a keyboard STOP, anywhere on the page. Capture phase, so widgets that
+  // swallow Escape (Blockly's keyboard navigation, dialogs) can never block it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') stop();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [robot.stop]);
 
   useEffect(() => {

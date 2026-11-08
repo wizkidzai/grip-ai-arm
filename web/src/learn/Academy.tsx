@@ -242,6 +242,7 @@ function MissionBrief({ lesson, done, onGo, onReplay }: { lesson: Lesson; done: 
           <li key={s.check}>{s.text}</li>
         ))}
       </ol>
+      <HowToVideo id={lesson.video} title={lesson.title} />
       <p className="hint">
         A guide bar stays at the top of the app while you work. It ticks each step off by itself. Earn: <strong>{lesson.badge}</strong>
       </p>
@@ -254,6 +255,22 @@ function MissionBrief({ lesson, done, onGo, onReplay }: { lesson: Lesson; done: 
         </button>
       </div>
     </div>
+  );
+}
+
+/** Maya and Ms. Nova showing the steps in the real app. Hidden if the video isn't there. */
+function HowToVideo({ id, title }: { id: string; title: string }) {
+  const [missing, setMissing] = useState(false);
+  if (missing) return null;
+  const src = `${import.meta.env.BASE_URL}videos/${id}`;
+  return (
+    <figure className="howto-video">
+      <video controls preload="none" poster={`${src}.jpg`} onError={() => setMissing(true)} aria-label={`How-to video: ${title}`}>
+        <source src={`${src}.mp4`} type="video/mp4" onError={() => setMissing(true)} />
+        <track kind="captions" src={`${src}.vtt`} srcLang="en" label="English" default />
+      </video>
+      <figcaption className="hint">📺 Watch Maya and Ms. Nova do it first (captions on, press play).</figcaption>
+    </figure>
   );
 }
 

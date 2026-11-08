@@ -1,5 +1,6 @@
 import * as Blockly from 'blockly/core';
-import * as En from 'blockly/msg/en';
+import '../blocks/locale';
+import { KeyboardNavigation } from '@blockly/keyboard-navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Skill, SavedPolicy } from '../ai/policy';
 import { STARTERS, TOOLBOX, defineBlocks, makeTheme, setSkillNames, workspaceToProgram } from '../blocks/blocklyDefs';
@@ -9,7 +10,17 @@ import { Robot } from './useRobot';
 
 const SAVE_KEY = 'grip.blocks.v1';
 
-Blockly.setLocale(En as unknown as Record<string, string>);
+// Keyboard-only block coding (WCAG 2.1.1). Registered once, before the first inject.
+// The toolbox must leave arrow keys to the plugin. We register that toolbox ourselves:
+// the plugin's own KeyboardNavigation.registerNavigationDeferringToolbox() (3.0.5) calls
+// itself forever and crashes the Code tab.
+class NavigationDeferringToolbox extends Blockly.Toolbox {
+  protected override onKeyDown_() {
+    /* the keyboard-navigation plugin handles keys */
+  }
+}
+Blockly.registry.register(Blockly.registry.Type.TOOLBOX, Blockly.registry.DEFAULT, NavigationDeferringToolbox, true);
+KeyboardNavigation.registerKeyboardNavigationStyles();
 
 function loadSaved(): object | null {
   try {
@@ -59,6 +70,7 @@ export default function CodePanel({
       grid: { spacing: 24, length: 2, colour: dark ? '#333044' : '#e3e0ef', snap: true },
     });
     ws.current = workspace;
+    const keyboardNav = new KeyboardNavigation(workspace);
     try {
       Blockly.serialization.workspaces.load(loadSaved() ?? STARTERS.wave.state, workspace);
     } catch {
@@ -80,6 +92,7 @@ export default function CodePanel({
     ro.observe(host.current);
     return () => {
       ro.disconnect();
+      keyboardNav.dispose();
       workspace.dispose();
       ws.current = null;
     };
@@ -151,6 +164,15 @@ export default function CodePanel({
       <div className="panel-head">
         <h2 id="code-title">Code with blocks</h2>
         <p className="hint">Snap blocks together like puzzle pieces, then press Go. Your work saves by itself.</p>
+        <details className="keyboard-help">
+          <summary>Use the keyboard instead of a mouse</summary>
+          <ul>
+            <li>Press Tab until the block area is outlined, then use the arrow keys to move around.</li>
+            <li>Press T to open the block list, arrows to pick a block, Enter to place it.</li>
+            <li>Press M to move a block, then arrows and Enter to drop it. Delete removes a block.</li>
+            <li>Press / to see every shortcut. Esc always stops the arm.</li>
+          </ul>
+        </details>
       </div>
 
       <div className="code-toolbar" role="toolbar" aria-label="Program controls">
@@ -209,12 +231,13 @@ export default function CodePanel({
         <span aria-hidden="true">💡</span> {hint}
       </p>
 
+      <div id="shortcuts" />
       <div className={`code-area ${showCode ? 'with-code' : ''}`}>
         <div
           ref={host}
           className="blockly-host"
           role="application"
-          aria-label="Block coding area. Drag blocks from the categories on the left."
+          aria-label="Block coding area. Drag blocks from the categories on the left, or press T to pick blocks with the keyboard."
         />
         {showCode && (
           <pre className="code-view" aria-label="Your program as Python code" tabIndex={0}>

@@ -137,6 +137,20 @@
   margin: 6px 0;
   font-weight: 600;
 }
+.howto-video {
+  margin: 12px 0;
+}
+.howto-video video {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: #0f0d20;
+}
+.howto-video figcaption {
+  margin-top: 4px;
+}
 
 /* ---------- cutscene player ---------- */
 .cutscene:focus {
@@ -340,6 +354,15 @@
 }
 .stats-card .stats-chart .bar {
   fill: #5b3df5;
+}
+.stats-sources {
+  margin: 2px 0 6px;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: #55526b;
+}
+.stats-sources a {
+  color: #4a33c9;
 }
 .bg-stage .role-card {
   color: #1d1b2f;

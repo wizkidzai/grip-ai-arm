@@ -114,21 +114,22 @@ function StatsChart() {
   const W = 300;
   const H = 200;
   const base = 160;
-  const max = 60;
-  const bw = 58;
+  const max = 40;
+  const step = (W - 40) / GIRLS_IN_ROBOTICS.length;
+  const bw = Math.min(58, step - 16);
   return (
     <>
       <svg viewBox={`0 0 ${W} ${H}`} className="art stats-chart" role="img" aria-labelledby="stats-title">
         <title id="stats-title">
-          Girls' share in robotics: elementary school about 50%, middle school about 20%, robotics and AI jobs about 16%.
+          {`Girls' and women's share in robotics: ${GIRLS_IN_ROBOTICS.map((d) => `${d.stage} about ${d.share}%`).join(', ')}.`}
         </title>
         <line x1="20" y1={base} x2={W - 20} y2={base} className="axis" />
         {GIRLS_IN_ROBOTICS.map((d, i) => {
           const h = ((base - 20) * d.share) / max;
-          const x = 34 + i * 88;
+          const x = 20 + i * step + (step - bw) / 2;
           return (
             <g key={d.stage} className="bar-group" style={{ animationDelay: `${0.3 + i * 0.9}s` }} tabIndex={0}>
-              <title>{`${d.stage}: about ${d.share}%. ${d.detail}.`}</title>
+              <title>{`${d.stage}: about ${d.share}%. ${d.detail}. Source: ${d.source}.`}</title>
               <rect x={x - 6} y={10} width={bw + 12} height={base - 10} fill="transparent" />
               <path
                 className="bar"
@@ -155,16 +156,28 @@ function StatsChart() {
         })}
       </svg>
       <table className="sr-only">
-        <caption>Girls' share in robotics at each stage</caption>
+        <caption>Girls' and women's share in robotics at each stage</caption>
         <tbody>
           {GIRLS_IN_ROBOTICS.map((d) => (
             <tr key={d.stage}>
               <th scope="row">{d.stage}</th>
               <td>about {d.share}%</td>
+              <td>{d.source}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      <p className="stats-sources">
+        Sources:{' '}
+        {GIRLS_IN_ROBOTICS.map((d, i) => (
+          <span key={d.stage}>
+            {i > 0 && ' · '}
+            <a href={d.url} target="_blank" rel="noreferrer">
+              {d.source}
+            </a>
+          </span>
+        ))}
+      </p>
     </>
   );
 }

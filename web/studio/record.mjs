@@ -70,7 +70,11 @@ async function record(video) {
     if (r.url().endsWith('/api/voice') && r.request().method() === 'POST' && r.ok()) {
       const at = Date.now();
       try {
-        pipAudio.push({ at, buf: await r.body() });
+        let buf = await r.body();
+        // Bodies of responses inside the app iframe sometimes come back empty. The voice
+        // server makes the same audio for the same text, so ask it again.
+        if (!buf.length) buf = await (await page.request.post(r.url(), { headers: { 'content-type': 'application/json' }, data: r.request().postData() ?? '' })).body();
+        if (buf.length) pipAudio.push({ at, buf });
       } catch {
         /* ignore */
       }
@@ -99,7 +103,10 @@ async function record(video) {
     const f = frame();
     let scope = target.card !== undefined ? f.locator('.arm-card').nth(target.card) : f;
     if (target.css) return scope.locator(target.css).nth(target.index ?? 0);
-    return scope.getByRole('button', { name: target.name, exact: target.exact ?? true }).first();
+    if (target.exact === false) return scope.getByRole('button', { name: target.name }).first();
+    // Whole name, ignoring any leading emoji or symbols ("🧪 Use a pretend arm").
+    const esc = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return scope.getByRole('button', { name: new RegExp(`^[^\\p{L}\\p{N}]*${esc}$`, 'u') }).first();
   };
   const pointAt = async (loc) => {
     await loc.scrollIntoViewIfNeeded().catch(() => {});
@@ -109,9 +116,22 @@ async function record(video) {
     await page.evaluate(({ x, y }) => window.__studio.cursor(x, y), { x: b.x - s.x + b.width / 2, y: b.y - s.y + b.height / 2 });
     await sleep(800);
   };
-  const doAction = async (a) => {
+  const doAction = (a, hidden = false) =>
+    runAction(a, hidden).catch(async (e) => {
+      // Leave a picture of what the app looked like, then stop this video.
+      await page.screenshot({ path: path.join(BUILD, `${video.id}-error.png`) }).catch(() => {});
+      throw new Error(`${video.id}: step ${JSON.stringify(a)} failed (see build/${video.id}-error.png)\n${e.message}`);
+    });
+  const runAction = async (a, hidden) => {
     if (a.wait) return sleep(a.wait);
     if (a.point) return pointAt(locate(a.point));
+    if (a.click && hidden) {
+      // Behind the title card a real mouse click would land on the card, not the app.
+      const loc = locate(a.click);
+      await loc.waitFor({ state: 'visible', timeout: 20000 });
+      await loc.evaluate((el) => el.click());
+      return sleep(350);
+    }
     if (a.click) {
       const loc = locate(a.click);
       await loc.waitFor({ state: 'visible', timeout: 20000 });
@@ -140,7 +160,7 @@ async function record(video) {
   };
 
   // Setup happens behind the title card.
-  for (const a of video.setup ?? []) await doAction(a);
+  for (const a of video.setup ?? []) await doAction(a, true);
   await sleep(Math.max(0, 3200 - (Date.now() - t0)));
   await page.evaluate(() => window.__studio.hideTitle());
   await sleep(500);
@@ -189,7 +209,7 @@ function build(video, { frames, said, pipAudio, t0, tEnd }) {
   const inputs = clips.flatMap((c) => ['-i', c.file]);
   const filters = clips.map((c, i) => {
     const d = Math.max(0, c.start - t0);
-    return `[${i}:a]aresample=48000,adelay=${d}|${d}[a${i}]`;
+    return `[${i + 1}:a]aresample=48000,adelay=${d}|${d}[a${i}]`; // input 0 is the silent video
   });
   const mix = `${filters.join(';')};${clips.map((_, i) => `[a${i}]`).join('')}amix=inputs=${clips.length}:normalize=0,apad[aout]`;
   const out = path.join(OUT, `${video.id}.mp4`);

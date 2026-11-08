@@ -46,11 +46,48 @@ export interface Scene {
   ms?: number;
 }
 
-/** The numbers behind the GRIP mission (see the GRIP Partner agent brief). */
+/**
+ * Girls' and women's share at each stage, with the published source for each number.
+ * Checked 2026-10-25. The two school numbers come from small regional surveys, so the
+ * narration says "about". Replace them if FIRST publishes national participation data.
+ */
 export const GIRLS_IN_ROBOTICS = [
-  { stage: 'Elementary school', share: 50, detail: 'About half of kids into building and robots are girls' },
-  { stage: 'Middle school', share: 20, detail: 'By middle school, only about 1 in 5' },
-  { stage: 'Robotics & AI jobs', share: 16, detail: 'In robotics and AI jobs, only about 1 in 6' },
+  {
+    stage: "Kids' robot teams",
+    share: 34,
+    detail: 'About 1 in 3 on FIRST LEGO League teams (ages 9 to 14)',
+    source: 'ColoradoFIRST survey of 149 FLL members, 2013',
+    url: 'https://legacy.coloradofirst.org/wp-content/uploads/2019/01/ColoradoFIRST-Program-Transitional-Analysis-Final-Paper.pdf',
+  },
+  {
+    stage: 'Teen robot teams',
+    share: 30,
+    detail: 'About 3 in 10 on high school FIRST Robotics teams',
+    source: 'Survey of 56 Pacific Northwest FRC teams, 2016',
+    url: 'https://www.ladiesinfirst.com/blogs/frc-female-involvement',
+  },
+  {
+    stage: 'Engineering degrees',
+    share: 23,
+    detail: 'About 1 in 4 new engineering degrees in the U.S.',
+    source: 'NCES data via the Society of Women Engineers, 2021',
+    url: 'https://swe.org/research/2024/degree-attainment/',
+  },
+  {
+    stage: 'Robotics jobs',
+    share: 16,
+    detail: 'About 1 in 6 people in U.S. robotics and engineering jobs',
+    source: 'National Girls Collaborative Project, via GBH News, 2025',
+    url: 'https://www.wgbh.org/news/local/2025-05-19/women-make-up-just-16-of-the-robotics-field-massrobotics-wants-to-change-that',
+  },
+];
+
+/** Where the role-model facts come from (checked 2026-10-25). */
+export const ROLE_MODEL_SOURCES = [
+  { name: 'Ayanna Howard', url: 'https://engineering.osu.edu/about/about-dean-ayanna-howard' },
+  { name: 'Cynthia Breazeal', url: 'https://en.wikipedia.org/wiki/Cynthia_Breazeal' },
+  { name: 'Daniela Rus', url: 'https://en.wikipedia.org/wiki/Daniela_Rus' },
+  { name: 'Fei-Fei Li', url: 'https://learning.acm.org/techtalks/ImageNet' },
 ];
 
 export const STORY: Scene[] = [
@@ -66,8 +103,8 @@ export const STORY: Scene[] = [
   {
     art: 'stats',
     caption:
-      "Here's something surprising. In elementary school, about half of the kids into building robots are girls. By middle school, it's only about one in five. And in robotics and AI jobs, about one in six.",
-    deeper: 'The share of girls drops the most between ages 11 and 14, right when many kids decide what they are "good at".',
+      "Here's something surprising. On kids' robot teams, only about one in three members are girls. On teen teams, it's about three in ten. And in robotics jobs, only about one in six people are women.",
+    deeper: 'Each number comes from a published study or survey. The sources are on the card. The school numbers come from small surveys, so they are a rough picture.',
     ms: 12000,
   },
   {
@@ -102,6 +139,8 @@ export interface Lesson {
   icon: string;
   badge: string;
   scenes: Scene[];
+  /** Recorded how-to video in public/videos (made by `npm run videos`). */
+  video: 'connect' | 'drive' | 'code' | 'teach' | 'train';
   mission: {
     tab: 'connect' | 'drive' | 'code' | 'teach' | 'train' | 'run';
     intro: string;
@@ -122,6 +161,7 @@ export type CheckId =
 export const LESSONS: Lesson[] = [
   {
     id: 'meet',
+    video: 'connect',
     title: 'Meet Pip & stay safe',
     icon: '👋',
     badge: '🛡️ Safety Star',
@@ -148,6 +188,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'drive',
+    video: 'drive',
     title: 'Move and wave',
     icon: '🕹️',
     badge: '🕹️ Pilot',
@@ -170,6 +211,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'code',
+    video: 'code',
     title: 'Code with blocks',
     icon: '🧩',
     badge: '🧩 Coder',
@@ -192,6 +234,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'teach',
+    video: 'teach',
     title: 'Teach by showing',
     icon: '🪞',
     badge: '🪞 Teacher',
@@ -217,6 +260,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'train',
+    video: 'train',
     title: 'Train the robot brain',
     icon: '🧠',
     badge: '🧠 AI Trainer',
@@ -237,6 +281,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'test',
+    video: 'train',
     title: 'Test like a scientist',
     icon: '🔬',
     badge: '🔬 Scientist',
