@@ -208,4 +208,24 @@ describe('Controller (simulated arms)', () => {
     expect((await follower.getState())[0]).toBeCloseTo(maxBase - 20, 0);
     c.shutdown();
   }, 10_000);
+
+  it('camera-safe wrist: the follower never spins past the limit, in Copy me or Drive', async () => {
+    const { c, follower, leaderBus } = await setup();
+    follower.wristSafe = { min: -30, max: 40 };
+    c.speed = 'fast';
+    c.startTeleop();
+    await sleep(200);
+    leaderBus.setByHand([0, 0, 0, 0, 150, 30]); // leader spins its wrist far
+    await sleep(1500);
+    expect((await follower.getState())[4]).toBeLessThanOrEqual(40.5);
+    leaderBus.setByHand([0, 0, 0, 0, -150, 30]);
+    await sleep(2500);
+    expect((await follower.getState())[4]).toBeGreaterThanOrEqual(-30.5);
+
+    await c.stop();
+    c.drive([0, 0, 0, 0, 120, 30]); // Drive tab asks for 120 deg
+    await sleep(2000);
+    expect((await follower.getState())[4]).toBeLessThanOrEqual(40.5);
+    c.shutdown();
+  }, 15_000);
 });

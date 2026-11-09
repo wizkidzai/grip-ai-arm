@@ -6,7 +6,7 @@ Code, drive and teach a **SO-ARM101** robot arm:
 |---|---|
 | 🔌 Connect | Connect real arms over USB (or pretend arms), calibrate, turn motors on |
 | 🕹️ Drive | Move the follower with big buttons, sliders and ready-made poses |
-| 🧩 Code | Scratch-style block coding (Blockly): moves, poses, hand, loops, waits, speed, trained skills |
+| 🧩 Code | Scratch-style block coding (Blockly): moves (incl. glide, nod, shake, wiggle, 3 joints at once), poses, hand, loops, waits, speed, surprise (random angle, "maybe", random wait), talk & sound ("say" with the natural voice, beeps and cheers), trained skills |
 | 🪞 Teach | Move the **leader**, the **follower** copies; record demos |
 | 🧠 Train | Train a small "robot brain" in the browser from the demos |
 | 🚀 Try it | The follower does the task by itself; test it 10 times like a scientist |
@@ -47,6 +47,53 @@ arms at a time: disconnect them in the app first.
 (LeRobot, older scripts) leave the port with `VMIN=0`, and Chrome then thinks the arm vanished. Unplug and
 replug the arm's USB cable, or run `stty -F /dev/ttyACM0 min 1 time 0` (and the same for `ttyACM1`).
 `tools/teleop.py` and `tools/fix_motor_id.py` put this back automatically when they exit.
+
+## 🎓 Academy and 📹 live class with the AI teacher
+**🎓 Teach me** (top right) opens the GRIP Academy: a story told in short animated "videos", six classes,
+and missions that tick themselves off in the real app. **📹 Live class** opens a video-call style lesson with
+**Ms. Nova**, an AI teacher (Claude, `claude-opus-5-5`) you can talk to (🎤) or type to.
+
+**The AI runs on this computer by default: free, no account or API key, and nothing leaves the computer.**
+The teacher server uses [Ollama](https://ollama.com) with a local model (best tested: `qwen2.5-coder:7b`;
+choose another with `GRIP_OLLAMA_MODEL`). If an Anthropic API key is set, it uses Claude (`claude-opus-5-5`) instead.
+
+```
+ollama pull qwen2.5-coder:7b   # once (about 4.7 GB)
+cd web && npm run teacher      # http://127.0.0.1:8787, reached through the app at /api
+```
+
+On this computer it also runs as a background service that starts at login:
+`systemctl --user status grip-teacher` (and `grip-ai-arm` serves the app with the teacher at http://localhost:8080).
+
+- **Natural voice:** Ms. Nova (and the story videos) speak with [Kokoro](https://github.com/hexgrad/kokoro), an open-source
+  neural voice that runs on this computer (`server/voice/voice_server.py`, port 8788, service `grip-voice`). Kids can pick
+  Nova, Bella, Nicole or Emma in the call. Setup: `cd server/voice && python3 -m venv .venv && .venv/bin/pip install
+  kokoro-onnx soundfile`, then download `kokoro-v1.0.onnx` and `voices-v1.0.bin` from the kokoro-onnx releases.
+  Without it the app uses the browser's least robotic voice.
+- A grown-up must allow the AI teacher once (the app explains what is sent where).
+- **Names, addresses, phone numbers, emails and school names are removed before the AI sees a message**, and the
+  server itself adds a "don't share personal details" reminder when that happens.
+- With the local AI, questions and answers stay on this computer. 🎤 uses the browser's speech recognition
+  (in Chrome, audio goes to Google); typing always works.
+- The teacher stays on robotics/STEM, never asks for personal details, and points kids to a trusted adult for anything serious.
+  Small local models can still get app details wrong; she is told to say "I'm not sure" instead of guessing.
+- Server limits: 600 characters per message, 30 turns of history, 40 requests per 10 minutes. Only `localhost` pages may call it.
+- On the GitHub Pages site the live class shows "offline": there is no teacher server there.
+
+### Challenge sheets
+Every live class Ms. Nova hands out a new challenge sheet (20 hand-written challenges in 12 kinds: drive, code, teach,
+AI training, quiz, camera, design on paper, experiments, robot pioneers, safety inspector, teach-it-back and a physical-AI
+hunt). Each class brings a different kind from the last one. Quizzes check themselves; every sheet can be printed.
+
+### 🎮 "Please close the YouTube tab": GRIP Focus Helper (optional)
+A website can't see other tabs, so this needs a small Chrome extension in `web/extension/`. A grown-up installs it once:
+**chrome://extensions → turn on Developer mode → Load unpacked → pick the `web/extension` folder.**
+- It only has access to game, video and social sites (YouTube, TikTok, Twitch, Netflix, Roblox, Minecraft, Fortnite,
+  Steam, Poki, Cool Math Games, Instagram, Discord and a few more, see `extension/sites.js`). Chrome doesn't let it see
+  the address of any other tab.
+- It only works on the GRIP app's own pages, reports only the site *name*, and keeps nothing.
+- During a class Ms. Nova says "Please close the YouTube tab" with a **Close YouTube tab** button, or **It's for class**.
+- Without it, Ms. Nova reminds kids to close game and video tabs when they come back to the class tab.
 
 ## How it fits together
 ```

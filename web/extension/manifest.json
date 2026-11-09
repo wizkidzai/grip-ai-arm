@@ -1,0 +1,75 @@
+{
+  "manifest_version": 3,
+  "name": "GRIP Focus Helper",
+  "version": "1.0.0",
+  "description": "Lets Ms. Nova (GRIP's AI teacher) notice game and video tabs during a live class and help close them.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "host_permissions": [
+    "*://youtube.com/*",
+    "*://*.youtube.com/*",
+    "*://youtu.be/*",
+    "*://*.youtu.be/*",
+    "*://youtubekids.com/*",
+    "*://*.youtubekids.com/*",
+    "*://tiktok.com/*",
+    "*://*.tiktok.com/*",
+    "*://twitch.tv/*",
+    "*://*.twitch.tv/*",
+    "*://netflix.com/*",
+    "*://*.netflix.com/*",
+    "*://disneyplus.com/*",
+    "*://*.disneyplus.com/*",
+    "*://primevideo.com/*",
+    "*://*.primevideo.com/*",
+    "*://hulu.com/*",
+    "*://*.hulu.com/*",
+    "*://roblox.com/*",
+    "*://*.roblox.com/*",
+    "*://minecraft.net/*",
+    "*://*.minecraft.net/*",
+    "*://fortnite.com/*",
+    "*://*.fortnite.com/*",
+    "*://epicgames.com/*",
+    "*://*.epicgames.com/*",
+    "*://steampowered.com/*",
+    "*://*.steampowered.com/*",
+    "*://steamcommunity.com/*",
+    "*://*.steamcommunity.com/*",
+    "*://poki.com/*",
+    "*://*.poki.com/*",
+    "*://crazygames.com/*",
+    "*://*.crazygames.com/*",
+    "*://coolmathgames.com/*",
+    "*://*.coolmathgames.com/*",
+    "*://friv.com/*",
+    "*://*.friv.com/*",
+    "*://miniclip.com/*",
+    "*://*.miniclip.com/*",
+    "*://agar.io/*",
+    "*://*.agar.io/*",
+    "*://slither.io/*",
+    "*://*.slither.io/*",
+    "*://instagram.com/*",
+    "*://*.instagram.com/*",
+    "*://snapchat.com/*",
+    "*://*.snapchat.com/*",
+    "*://discord.com/*",
+    "*://*.discord.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://wizkidzai.github.io/grip-ai-arm/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ export type JointId = (typeof JOINT_IDS)[number];
 export type Joints = [number, number, number, number, number, number];
 
 export const NUM_JOINTS = 6;
+export const WRIST_ROLL = 4;
 export const GRIPPER = 5;
 
 export interface JointInfo {

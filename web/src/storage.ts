@@ -11,6 +11,7 @@ import { SavedPolicy, isSavedPolicy } from './ai/policy';
 const KEYS = {
   // v3: older calibrations may have been made with the power adapters swapped.
   calibration: (role: ArmRole) => `grip.calibration.v3.${role}`,
+  wristSafe: 'grip.wristSafe',
   episodes: 'grip.episodes',
   skills: 'grip.skills',
 };
@@ -41,6 +42,23 @@ export const storage = {
   },
   saveCalibration(role: ArmRole, cal: ArmCalibration) {
     return write(KEYS.calibration(role), cal);
+  },
+  /** Camera-safe wrist range, only valid for the follower calibration it was measured with. */
+  loadWristSafe(calibratedAt: string): { min: number; max: number } | null {
+    const v = read(KEYS.wristSafe) as { calibratedAt?: string; min?: number; max?: number } | null;
+    if (!v || v.calibratedAt !== calibratedAt) return null;
+    if (!Number.isFinite(v.min) || !Number.isFinite(v.max) || Math.abs(v.max! - v.min!) < 10) return null;
+    return { min: v.min!, max: v.max! };
+  },
+  saveWristSafe(calibratedAt: string, min: number, max: number) {
+    return write(KEYS.wristSafe, { calibratedAt, min, max });
+  },
+  clearWristSafe() {
+    try {
+      localStorage.removeItem(KEYS.wristSafe);
+    } catch {
+      /* fine */
+    }
   },
   loadEpisodes(): Episode[] {
     const v = read(KEYS.episodes);

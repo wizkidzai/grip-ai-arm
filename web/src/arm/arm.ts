@@ -1,7 +1,7 @@
 import { ServoBus } from '../drivers/types';
 import { ArmCalibration, jointsToRaw, limitsFromCalibration, rawToJoints } from './calibration';
-import { Joints } from './joints';
-import { Limits, clampTarget, safeStep } from './safety';
+import { Joints, WRIST_ROLL } from './joints';
+import { JointLimit, Limits, clampTarget, safeStep } from './safety';
 
 export type ArmRole = 'leader' | 'follower';
 
@@ -20,8 +20,23 @@ export class Arm {
     readonly calibration: ArmCalibration,
   ) {}
 
+  /**
+   * Camera-safe range for the wrist spin (degrees), measured by hand. With a camera on
+   * the wrist, spinning past it puts the camera underneath, where it can hit the table
+   * or pull its cable until it snaps. Every mode goes through `limits`, so all respect it.
+   */
+  wristSafe: JointLimit | null = null;
+
   get limits(): Limits {
-    return limitsFromCalibration(this.calibration);
+    const lim = limitsFromCalibration(this.calibration);
+    if (this.wristSafe) {
+      const w = lim[WRIST_ROLL];
+      lim[WRIST_ROLL] = {
+        min: Math.max(w.min, Math.min(this.wristSafe.min, this.wristSafe.max)),
+        max: Math.min(w.max, Math.max(this.wristSafe.min, this.wristSafe.max)),
+      };
+    }
+    return lim;
   }
 
   get torque() {

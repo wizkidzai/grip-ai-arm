@@ -3,7 +3,8 @@ import { Episode, FPS, episodeDuration, toLeRobotRows } from '../ai/episodes';
 import { JOINTS } from '../arm/joints';
 import { SPEEDS, SpeedName } from '../arm/safety';
 import { downloadJson } from '../storage';
-import { Robot } from './useRobot';
+import { Ask, Robot } from './useRobot';
+import { SelectableList } from './common';
 
 export function TeachPanel({
   robot,
@@ -58,6 +59,12 @@ export function TeachPanel({
         task so the robot brain can learn it.
       </p>
       {!ready && <p className="callout">Connect both arms and turn on the follower motors first.</p>}
+      {slots.follower.bus?.kind === 'serial' && slots.follower.status === 'ready' && !robot.wristSafe && (
+        <p className="callout warn">
+          📷 Has the follower got a wrist camera? Set its <strong>camera-safe wrist spin</strong> on the Connect tab
+          first, so the wrist can never spin the camera underneath and snap its cable.
+        </p>
+      )}
 
       <div className="card">
         <div className="row">
@@ -117,7 +124,7 @@ export function TeachPanel({
       {copying && <HandStatus robot={robot} />}
       {copying && <CopyCheck robot={robot} />}
 
-      <EpisodeList robot={robot} episodes={episodes} setEpisodes={setEpisodes} guard={guard} />
+      <EpisodeList robot={robot} episodes={episodes} setEpisodes={setEpisodes} guard={guard} confirm={confirm} />
     </section>
   );
 }
@@ -127,11 +134,13 @@ function EpisodeList({
   episodes,
   setEpisodes,
   guard,
+  confirm,
 }: {
   robot: Robot;
   episodes: Episode[];
   setEpisodes: (e: Episode[]) => void;
   guard: (fn: () => void) => Promise<void>;
+  confirm: Ask;
 }) {
   const busy = robot.telemetry.mode !== 'idle';
   const canMove = robot.slots.follower.status === 'ready' && robot.motorsOn;
@@ -148,27 +157,24 @@ function EpisodeList({
           ⬇️ Download data
         </button>
       </div>
-      <ul className="episodes">
-        {episodes.map((e, i) => (
-          <li key={e.id}>
-            <span>
+      <SelectableList
+        noun="demo"
+        confirm={confirm}
+        onDelete={(ids) => setEpisodes(episodes.filter((x) => !ids.includes(x.id)))}
+        items={episodes.map((e, i) => ({
+          id: e.id,
+          content: (
+            <>
               #{i + 1} <strong>{e.task}</strong> · {episodeDuration(e).toFixed(1)} s
-            </span>
-            <span className="row">
-              <button className="btn small" disabled={busy || !canMove} onClick={() => guard(() => robot.controller.startReplay(e))}>
-                ▶️ Replay
-              </button>
-              <button
-                className="btn small"
-                aria-label={`Delete demo ${i + 1}`}
-                onClick={() => setEpisodes(episodes.filter((x) => x.id !== e.id))}
-              >
-                🗑
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
+            </>
+          ),
+          actions: (
+            <button className="btn small" disabled={busy || !canMove} onClick={() => guard(() => robot.controller.startReplay(e))}>
+              ▶️ Replay
+            </button>
+          ),
+        }))}
+      />
     </div>
   );
 }

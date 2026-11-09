@@ -18,7 +18,21 @@ export type Stmt =
   | { kind: 'wait'; id: string; seconds: number }
   | { kind: 'repeat'; id: string; times: number; body: Stmt[] }
   | { kind: 'forever'; id: string; body: Stmt[] }
-  | { kind: 'skill'; id: string; task: string };
+  | { kind: 'skill'; id: string; task: string }
+  | { kind: 'moveMany'; id: string; base: number; shoulder: number; elbow: number }
+  | { kind: 'glide'; id: string; joint: JointId; value: number; seconds: number }
+  | { kind: 'nod'; id: string }
+  | { kind: 'shake'; id: string }
+  | { kind: 'wiggle'; id: string; times: number }
+  | { kind: 'randomMove'; id: string; joint: JointId; min: number; max: number }
+  | { kind: 'chance'; id: string; percent: number; body: Stmt[] }
+  | { kind: 'waitRandom'; id: string; min: number; max: number }
+  | { kind: 'say'; id: string; text: string }
+  | { kind: 'sound'; id: string; sound: SoundName };
+
+export const SOUNDS = ['beep', 'cheer', 'boing', 'whoosh'] as const;
+export type SoundName = (typeof SOUNDS)[number];
+export const MAX_SAY = 120;
 
 export interface Program {
   version: 1;
@@ -30,7 +44,10 @@ export type Command =
   | { op: 'moveBy'; blockId: string; by: number[] }
   | { op: 'wait'; blockId: string; seconds: number }
   | { op: 'speed'; blockId: string; speed: SpeedName }
-  | { op: 'skill'; blockId: string; task: string };
+  | { op: 'skill'; blockId: string; task: string }
+  | { op: 'moveTimed'; blockId: string; set: (number | null)[]; seconds: number }
+  | { op: 'say'; blockId: string; text: string }
+  | { op: 'sound'; blockId: string; sound: SoundName };
 
 export interface CompileError {
   blockId: string;
@@ -62,7 +79,16 @@ function rangeError(i: number, value: number, limits: Limits): string | null {
   return `Whoa, the ${name} can't go to ${fmt(value)}°. Try a number between ${fmt(min)} and ${fmt(max)}!`;
 }
 
-export function compile(program: Program, limits: Limits, skills: string[] = []): CompileResult {
+/**
+ * `random` decides the "surprise" blocks each time a program is compiled (= each press of Go),
+ * so every run can be different; tests pass a seeded one.
+ */
+export function compile(
+  program: Program,
+  limits: Limits,
+  skills: string[] = [],
+  random: () => number = Math.random,
+): CompileResult {
   const commands: Command[] = [];
   const errors: CompileError[] = [];
   let truncated = false;
@@ -122,6 +148,56 @@ export function compile(program: Program, limits: Limits, skills: string[] = [])
           break;
         case 'skill':
           if (!skills.includes(s.task)) err(s.id, 'Train this skill first (in the Train step), then pick it here.');
+          break;
+        case 'moveMany': {
+          const e =
+            rangeError(jointIndex('shoulder_pan'), s.base, limits) ??
+            rangeError(jointIndex('shoulder_lift'), s.shoulder, limits) ??
+            rangeError(jointIndex('elbow_flex'), s.elbow, limits);
+          if (e) err(s.id, e);
+          break;
+        }
+        case 'glide': {
+          const i = jointIndex(s.joint);
+          if (i < 0 || i === GRIPPER) err(s.id, 'Pick a joint to glide.');
+          else {
+            const e = rangeError(i, s.value, limits);
+            if (e) err(s.id, e);
+            else if (!Number.isFinite(s.seconds) || s.seconds < 0.2 || s.seconds > MAX_WAIT) {
+              err(s.id, `Glide for between 0.2 and ${MAX_WAIT} seconds.`);
+            }
+          }
+          break;
+        }
+        case 'nod':
+        case 'shake':
+          break;
+        case 'wiggle':
+          if (!Number.isInteger(s.times) || s.times < 1 || s.times > 10) err(s.id, 'Wiggle between 1 and 10 times.');
+          break;
+        case 'randomMove': {
+          const i = jointIndex(s.joint);
+          if (i < 0 || i === GRIPPER) err(s.id, 'Pick a joint.');
+          else if (!(s.min <= s.max)) err(s.id, 'The first number should be smaller than the second one.');
+          else {
+            const e = rangeError(i, s.min, limits) ?? rangeError(i, s.max, limits);
+            if (e) err(s.id, e);
+          }
+          break;
+        }
+        case 'chance':
+          if (!Number.isFinite(s.percent) || s.percent < 0 || s.percent > 100) err(s.id, 'Pick a chance from 0% to 100%.');
+          validate(s.body, depth + 1);
+          break;
+        case 'waitRandom':
+          if (!(s.min >= 0 && s.max <= MAX_WAIT && s.min <= s.max)) err(s.id, `Pick two times from 0 to ${MAX_WAIT} seconds, smaller one first.`);
+          break;
+        case 'say':
+          if (!s.text.trim()) err(s.id, 'Type something for Pip to say.');
+          else if (s.text.length > MAX_SAY) err(s.id, `That's a lot to say! Keep it under ${MAX_SAY} letters.`);
+          break;
+        case 'sound':
+          if (!SOUNDS.includes(s.sound)) err(s.id, 'Pick a sound.');
           break;
         default:
           err((s as Stmt).id ?? '', 'This block is not ready yet.');
@@ -183,6 +259,50 @@ export function compile(program: Program, limits: Limits, skills: string[] = [])
         case 'skill':
           commands.push({ op: 'skill', blockId: s.id, task: s.task });
           break;
+        case 'moveMany':
+          commands.push({ op: 'move', blockId: s.id, set: [s.base, s.shoulder, s.elbow, null, null, null] });
+          break;
+        case 'glide': {
+          const set: (number | null)[] = new Array(6).fill(null);
+          set[jointIndex(s.joint)] = s.value;
+          commands.push({ op: 'moveTimed', blockId: s.id, set, seconds: s.seconds });
+          break;
+        }
+        case 'nod': // shoulder down and up, twice
+          for (let k = 0; k < 2; k++) {
+            commands.push({ op: 'moveBy', blockId: s.id, by: [0, 15, 0, 0, 0, 0] });
+            commands.push({ op: 'moveBy', blockId: s.id, by: [0, -15, 0, 0, 0, 0] });
+          }
+          break;
+        case 'shake': // base left, right, back to the middle
+          commands.push({ op: 'moveBy', blockId: s.id, by: [20, 0, 0, 0, 0, 0] });
+          commands.push({ op: 'moveBy', blockId: s.id, by: [-40, 0, 0, 0, 0, 0] });
+          commands.push({ op: 'moveBy', blockId: s.id, by: [20, 0, 0, 0, 0, 0] });
+          break;
+        case 'wiggle':
+          for (let k = 0; k < s.times && !full(); k++) {
+            commands.push({ op: 'moveBy', blockId: s.id, by: [0, 0, 0, 0, 25, 0] });
+            commands.push({ op: 'moveBy', blockId: s.id, by: [0, 0, 0, 0, -25, 0] });
+          }
+          break;
+        case 'randomMove': {
+          const set: (number | null)[] = new Array(6).fill(null);
+          set[jointIndex(s.joint)] = Math.round(s.min + random() * (s.max - s.min));
+          commands.push({ op: 'move', blockId: s.id, set });
+          break;
+        }
+        case 'chance':
+          if (random() * 100 < s.percent) emit(s.body);
+          break;
+        case 'waitRandom':
+          commands.push({ op: 'wait', blockId: s.id, seconds: Math.round((s.min + random() * (s.max - s.min)) * 10) / 10 });
+          break;
+        case 'say':
+          commands.push({ op: 'say', blockId: s.id, text: s.text.trim().slice(0, MAX_SAY) });
+          break;
+        case 'sound':
+          commands.push({ op: 'sound', blockId: s.id, sound: s.sound });
+          break;
       }
     }
   };
@@ -192,7 +312,7 @@ export function compile(program: Program, limits: Limits, skills: string[] = [])
 
 /** "Show me the code": a readable Python-style version for older learners. */
 export function toPython(program: Program): string {
-  const lines = ['# Made with GRIP blocks', 'from grip import arm', ''];
+  const lines = ['# Made with GRIP blocks', 'import random', 'from grip import arm', ''];
   const write = (body: Stmt[], indent: string) => {
     if (!body.length) lines.push(`${indent}pass`);
     for (const s of body) {
@@ -225,6 +345,37 @@ export function toPython(program: Program): string {
           break;
         case 'skill':
           lines.push(`${indent}arm.run_skill("${s.task}")`);
+          break;
+        case 'moveMany':
+          lines.push(`${indent}arm.move_many(base=${s.base}, shoulder=${s.shoulder}, elbow=${s.elbow})`);
+          break;
+        case 'glide':
+          lines.push(`${indent}arm.glide("${s.joint}", to=${s.value}, seconds=${s.seconds})`);
+          break;
+        case 'nod':
+          lines.push(`${indent}arm.nod()`);
+          break;
+        case 'shake':
+          lines.push(`${indent}arm.shake()`);
+          break;
+        case 'wiggle':
+          lines.push(`${indent}arm.wiggle_wrist(times=${s.times})`);
+          break;
+        case 'randomMove':
+          lines.push(`${indent}arm.move("${s.joint}", to=random.randint(${s.min}, ${s.max}))`);
+          break;
+        case 'chance':
+          lines.push(`${indent}if random.random() < ${s.percent / 100}:`);
+          write(s.body, indent + '    ');
+          break;
+        case 'waitRandom':
+          lines.push(`${indent}arm.wait(random.uniform(${s.min}, ${s.max}))`);
+          break;
+        case 'say':
+          lines.push(`${indent}arm.say(${JSON.stringify(s.text)})`);
+          break;
+        case 'sound':
+          lines.push(`${indent}arm.play_sound("${s.sound}")`);
           break;
       }
     }

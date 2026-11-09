@@ -1,0 +1,32 @@
+[
+  {
+    "id": "connect",
+    "title": "Connect your robot arms",
+    "subtitle": "Pretend arms, real arms, and the STOP button",
+    "seconds": 48
+  },
+  {
+    "id": "drive",
+    "title": "Drive Pip",
+    "subtitle": "Poses, joints and the hand",
+    "seconds": 37
+  },
+  {
+    "id": "code",
+    "title": "Code with blocks",
+    "subtitle": "Make Pip do a whole show by itself",
+    "seconds": 42
+  },
+  {
+    "id": "teach",
+    "title": "Teach Pip by showing",
+    "subtitle": "Copy me and recording demos",
+    "seconds": 41
+  },
+  {
+    "id": "train",
+    "title": "Train a robot brain",
+    "subtitle": "Learning from demos, then testing like a scientist",
+    "seconds": 33
+  }
+]

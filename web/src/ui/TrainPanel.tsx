@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { Episode } from '../ai/episodes';
 import { SavedPolicy, Skill, trainPolicy } from '../ai/policy';
-import { LossChart } from './common';
-import { Robot } from './useRobot';
+import { LossChart, SelectableList } from './common';
+import { Ask, Robot } from './useRobot';
 
 const EFFORT = {
   quick: { steps: 800, label: '⚡ Quick (a few seconds)' },
@@ -16,11 +16,13 @@ export function TrainPanel({
   episodes,
   skills,
   setSkills,
+  confirm,
 }: {
   robot: Robot;
   episodes: Episode[];
   skills: SavedPolicy[];
   setSkills: (s: SavedPolicy[]) => void;
+  confirm: Ask;
 }) {
   const tasks = [...new Set(episodes.map((e) => e.task))];
   const [task, setTask] = useState(tasks[0] ?? '');
@@ -124,18 +126,19 @@ export function TrainPanel({
       {skills.length > 0 && (
         <div className="card">
           <h3>🧠 My trained brains</h3>
-          <ul className="episodes">
-            {skills.map((s) => (
-              <li key={s.createdAt}>
-                <span>
+          <SelectableList
+            noun="brain"
+            confirm={confirm}
+            onDelete={(ids) => setSkills(skills.filter((x) => !ids.includes(x.createdAt)))}
+            items={skills.map((s) => ({
+              id: s.createdAt,
+              content: (
+                <>
                   <strong>{s.task}</strong> · learned from {s.episodes} demos · mistakes {s.finalLoss.toFixed(3)}
-                </span>
-                <button className="btn small" aria-label={`Delete ${s.task} brain`} onClick={() => setSkills(skills.filter((x) => x !== s))}>
-                  🗑
-                </button>
-              </li>
-            ))}
-          </ul>
+                </>
+              ),
+            }))}
+          />
         </div>
       )}
     </section>

@@ -6,7 +6,7 @@ description: "Use when writing learner-facing content for GRIP: lessons, challen
 # Teaching Robotics and Physical AI to Girls (8-17)
 
 ## Why this matters
-Girls' interest in STEM drops from about 50% in elementary school to about 20% in middle school, and to roughly 16% in robotics/AI jobs. Content should build **confidence, belonging, and creativity** during these years.
+Girls are about 1 in 3 on kids' robotics teams, about 3 in 10 on teen teams, and about 1 in 6 people in robotics jobs (sources in `web/src/learn/lessons.ts`). Content should build **confidence, belonging, and creativity** during these years.
 
 ## Principles
 - **Make, don't just consume**: every lesson ends with the learner making the arm do something she designed.

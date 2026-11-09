@@ -7,6 +7,11 @@ import { SimBus } from '../drivers/simBus';
 import { powerProblem } from '../drivers/feetech';
 import { ArmConnectionError, ServoBus } from '../drivers/types';
 import { storage } from '../storage';
+import { playSound } from '../sounds';
+import { VoicePlayer } from '../voice';
+
+/** The voice Pip uses for the "say" block. */
+const programVoice = new VoicePlayer();
 
 export type Ask = (title: string, body: string, ok?: string, cancel?: string) => Promise<boolean>;
 
@@ -44,6 +49,7 @@ export function useRobot() {
   const [telemetry, setTelemetry] = useState<Telemetry>(EMPTY_TELEMETRY);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [motorsOn, setMotorsOn] = useState(false);
+  const [wristSafe, setWristSafeState] = useState<{ min: number; max: number } | null>(null);
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
 
@@ -53,6 +59,11 @@ export function useRobot() {
       onTelemetry: setTelemetry,
       onAutoStop: (text) => setNotice({ kind: text.includes('🎉') ? 'success' : 'warn', text }),
       onWarning: (text) => setNotice({ kind: 'info', text }),
+      // Block programs: "say" uses the natural voice, "play sound" a little browser sound.
+      onProgramEvent: (e) => {
+        if ('say' in e) programVoice.say(e.say);
+        else playSound(e.sound);
+      },
     });
   }
   const controller = controllerRef.current;
@@ -86,6 +97,7 @@ export function useRobot() {
   }, []);
 
   const stop = useCallback(() => {
+    programVoice.stop(); // STOP also stops Pip talking
     void controller.stop();
   }, [controller]);
 
@@ -118,7 +130,11 @@ export function useRobot() {
     (role: ArmRole, bus: ServoBus, cal: ArmCalibration) => {
       const arm = new Arm(bus, role, cal);
       if (role === 'leader') controller.leader = arm;
-      else controller.follower = arm;
+      else {
+        arm.wristSafe = bus.kind === 'serial' ? storage.loadWristSafe(cal.createdAt) : null;
+        setWristSafeState(arm.wristSafe);
+        controller.follower = arm;
+      }
       setSlot(role, { status: 'ready', bus, arm });
       return arm;
     },
@@ -269,6 +285,8 @@ export function useRobot() {
     (role: ArmRole, cal: ArmCalibration) => {
       const bus = slotsRef.current[role].bus;
       if (!bus) return;
+      // A new calibration changes the follower's angles, so the old camera-safe range is wrong.
+      if (role === 'follower') storage.clearWristSafe();
       if (!storage.saveCalibration(role, cal)) {
         setNotice({ kind: 'warn', text: 'We could not save the calibration in this browser, but you can keep going.' });
       }
@@ -306,8 +324,20 @@ export function useRobot() {
     setMotorsOn(true);
   }, [attach, disconnect]);
 
+  /** Save the camera-safe wrist range (degrees); `null` clears it. */
+  const setWristSafe = useCallback((range: { min: number; max: number } | null) => {
+    const arm = slotsRef.current.follower.arm;
+    if (!arm) return;
+    arm.wristSafe = range;
+    setWristSafeState(range);
+    if (range) storage.saveWristSafe(arm.calibration.createdAt, range.min, range.max);
+    else storage.clearWristSafe();
+  }, []);
+
   return {
     controller,
+    wristSafe,
+    setWristSafe,
     handFlipped,
     setHandFlipped,
     connectBoth,
