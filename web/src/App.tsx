@@ -3,10 +3,12 @@ import { Episode } from './ai/episodes';
 import { SavedPolicy } from './ai/policy';
 import { ArmRole } from './arm/arm';
 import { Mode } from './control/controller';
+import { GRIPPER, Joints } from './arm/joints';
+import { solveTip } from './arm/ik';
+import { clampTarget } from './arm/safety';
 import { storage } from './storage';
 import { ArmPreview } from './ui/ArmPreview';
 import { CalibrationWizard } from './ui/CalibrationWizard';
-import { CameraView } from './ui/CameraView';
 import { ConnectPanel, SimLeaderSliders } from './ui/ConnectPanel';
 import { DrivePanel } from './ui/DrivePanel';
 import { Academy, LearnProgress, MissionBanner, lessonById, loadProgress, saveProgress } from './learn/Academy';
@@ -15,7 +17,7 @@ import { AppContext, TeacherCall } from './teacher/TeacherCall';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { TeachPanel } from './ui/TeachPanel';
 import { RunPanel, TrainPanel } from './ui/TrainPanel';
-import { JointReadout, useConfirm } from './ui/common';
+import { useConfirm } from './ui/common';
 import { Robot, useRobot } from './ui/useRobot';
 
 // Blockly is big, so it only loads when someone opens the Code tab.
@@ -167,84 +169,95 @@ export default function App() {
   const calibrating = (['leader', 'follower'] as ArmRole[]).find((r) => robot.slots[r].status === 'needs-calibration');
   const moving = telemetry.mode !== 'idle';
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const openAcademy = () => {
+    setAcademyStart(null);
+    setAcademyOpen(true);
+    setMenuOpen(false);
+  };
+  const MAIN_IDS: string[] = ['drive', 'code', 'teach', 'run'];
+  const MAIN = TABS.filter((t) => MAIN_IDS.includes(t.id));
+  const MORE = TABS.filter((t) => !MAIN_IDS.includes(t.id));
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const pick = (t: TabId) => {
+    if (t === tab && sheetOpen) setSheetOpen(false);
+    else {
+      setTab(t);
+      setSheetOpen(true);
+    }
+    setMenuOpen(false);
+  };
+
   return (
-    <div className="app">
+    <div className="app simple">
       <a className="skip" href="#main">
         Skip to content
       </a>
-      <header className="topbar">
-        <div className="brand">
-          <span className="logo" aria-hidden="true">
-            🦾
-          </span>
-          <div>
-            <h1>GRIP AI Arm</h1>
-            <p className="tagline">Code it. Teach it. Train it.</p>
-          </div>
-        </div>
-        <ArmChips robot={robot} onClick={() => setTab('connect')} />
+      <div className="sim-full">
+        <Stage robot={robot} highlight={highlight} confirm={confirm} />
+      </div>
+
+      <header className="s-top">
+        <span className="s-brand">🦾 GRIP</span>
         <p className={`status ${moving ? 'moving' : ''}`} role="status" aria-live="polite">
           <span className="status-dot" aria-hidden="true" />
           {MODE_TEXT[telemetry.mode]}
-          {telemetry.recording && ' · ⏺ rec'}
+          {telemetry.recording && ' · ⏺'}
         </p>
-        <button className="btn live-class" onClick={() => setCallOpen(true)} title="Join a live class with Ms. Nova, the AI teacher">
-          📹 <span className="label">Live class</span>
-        </button>
-        <button
-          className="btn primary teach-me"
-          onClick={() => {
-            setAcademyStart(null);
-            setAcademyOpen(true);
-          }}
-          title="Learn how to use the app, step by step"
-        >
-          🎓 <span className="label">Teach me</span>
-        </button>
+        <span className="s-spacer" />
+        <div className="s-menu-wrap">
+          <button className="s-round" aria-expanded={menuOpen} aria-label="Menu" onClick={() => setMenuOpen((o) => !o)}>
+            ☰
+          </button>
+          {menuOpen && (
+            <div className="s-menu" role="menu">
+              {MORE.map((t) => (
+                <button key={t.id} role="menuitem" onClick={() => pick(t.id)}>
+                  {t.icon} {t.label}
+                </button>
+              ))}
+              <button role="menuitem" onClick={openAcademy}>
+                🎓 Teach me
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setCallOpen(true);
+                  setMenuOpen(false);
+                }}
+              >
+                📹 Live class
+              </button>
+            </div>
+          )}
+        </div>
         <button className="stop" onClick={stop} aria-keyshortcuts="Escape" title="Stop everything (Esc)">
-          <span aria-hidden="true">✋</span> STOP
+          ✋ STOP
         </button>
       </header>
 
-      <nav className="tabs" aria-label="Sections">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`tab ${tab === t.id ? 'active' : ''}`}
-            aria-current={tab === t.id ? 'page' : undefined}
-            onClick={() => setTab(t.id)}
-          >
-            <span className="tab-icon" aria-hidden="true">
-              {t.icon}
-            </span>
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </nav>
-
       {mission && (
-        <MissionBanner
-          lesson={mission}
-          checks={checks}
-          complete={missionComplete}
-          onOpenAcademy={() => {
-            setAcademyStart(null);
-            setAcademyOpen(true);
-          }}
-          onNext={
-            nextLesson
-              ? () => {
-                  setAcademyStart(nextLesson.id);
-                  setAcademyOpen(true);
-                }
-              : null
-          }
-          onClose={() => setLearn({ ...learn, active: null })}
-        />
+        <div className="s-banner">
+          <MissionBanner
+            lesson={mission}
+            checks={checks}
+            complete={missionComplete}
+            onOpenAcademy={openAcademy}
+            onNext={
+              nextLesson
+                ? () => {
+                    setAcademyStart(nextLesson.id);
+                    setAcademyOpen(true);
+                  }
+                : null
+            }
+            onClose={() => setLearn({ ...learn, active: null })}
+          />
+        </div>
       )}
 
       {notice && (
-        <div className={`notice ${notice.kind}`} role={notice.kind === 'warn' ? 'alert' : 'status'}>
+        <div className={`notice s-notice ${notice.kind}`} role={notice.kind === 'warn' ? 'alert' : 'status'}>
           <span>{notice.text}</span>
           <button className="btn link" onClick={() => setNotice(null)} aria-label="Close message">
             ✕
@@ -252,8 +265,11 @@ export default function App() {
         </div>
       )}
 
-      <main id="main" className={`layout ${tab === 'code' ? 'wide' : ''}`}>
-        <div className="main-col">
+      {sheetOpen && (
+        <main id="main" className={`s-sheet ${tab === 'code' ? 'wide' : ''}`}>
+          <button className="s-close" onClick={() => setSheetOpen(false)} aria-label="Close panel">
+            ✕
+          </button>
           {calibrating && robot.slots[calibrating].bus ? (
             <CalibrationWizard
               key={calibrating}
@@ -272,7 +288,10 @@ export default function App() {
                 </Suspense>
               )}
               {tab === 'teach' && (
-                <TeachPanel robot={robot} episodes={episodes} setEpisodes={setEpisodes} confirm={confirm} />
+                <>
+                  <TeachPanel robot={robot} episodes={episodes} setEpisodes={setEpisodes} confirm={confirm} />
+                  <SimLeaderSliders robot={robot} />
+                </>
               )}
               {tab === 'train' && <TrainPanel robot={robot} episodes={episodes} skills={skills} setSkills={setSkills} confirm={confirm} />}
               {tab === 'run' && <RunPanel robot={robot} skills={skills} confirm={confirm} />}
@@ -286,15 +305,19 @@ export default function App() {
                   confirm={confirm}
                 />
               )}
+              {tab === 'connect' && <SimLeaderSliders robot={robot} />}
             </>
           )}
-        </div>
-        <aside className="side-col" aria-label="Live view of the arm">
-          <Stage robot={robot} highlight={highlight} />
-          <CameraView />
-          {(tab === 'teach' || tab === 'connect') && <SimLeaderSliders robot={robot} />}
-        </aside>
-      </main>
+        </main>
+      )}
+
+      <nav className="s-dock" aria-label="Sections">
+        {MAIN.map((t) => (
+          <button key={t.id} className={tab === t.id && sheetOpen ? 'active' : ''} onClick={() => pick(t.id)}>
+            <span aria-hidden="true">{t.icon}</span> {t.label}
+          </button>
+        ))}
+      </nav>
       {dialog}
       {academyOpen && (
         <Academy
@@ -314,92 +337,79 @@ export default function App() {
   );
 }
 
-function ArmChips({ robot, onClick }: { robot: Robot; onClick: () => void }) {
-  const chip = (role: ArmRole) => {
-    const slot = robot.slots[role];
-    const name = role === 'leader' ? '🎮 Leader' : '🤖 Follower';
-    let state = 'not connected';
-    let cls = 'off';
-    if (slot.status === 'connecting') [state, cls] = ['connecting…', 'busy'];
-    else if (slot.status === 'needs-calibration') [state, cls] = ['needs calibration', 'busy'];
-    else if (slot.status === 'ready') {
-      const kind = slot.bus?.kind === 'sim' ? 'pretend' : 'real';
-      if (role === 'follower') [state, cls] = [`${kind} · motors ${robot.motorsOn ? 'on' : 'off'}`, robot.motorsOn ? 'on' : 'busy'];
-      else [state, cls] = [kind, 'on'];
-    }
-    return (
-      <button key={role} className={`chip ${cls}`} onClick={onClick} title="Open the Connect tab">
-        <span className="chip-dot" aria-hidden="true" />
-        <span className="chip-name">{name}</span>
-        <span className="chip-state">{state}</span>
-      </button>
-    );
-  };
-  return (
-    <div className="chips" aria-label="Arm connections">
-      {chip('leader')}
-      {chip('follower')}
-    </div>
-  );
-}
+function Stage({
+  robot,
+  highlight,
+  confirm,
+}: {
+  robot: Robot;
+  highlight: number | null;
+  confirm: (t: string, b: string) => Promise<boolean>;
+}) {
+  const { telemetry, controller, slots, motorsOn } = robot;
+  const arm = slots.follower.arm;
+  const live = slots.follower.status === 'ready' && motorsOn && !!arm && !!telemetry.follower;
+  const isReal = slots.follower.bus?.kind === 'serial';
+  const okayed = useRef(!isReal);
+  const goal = useRef<Joints | null>(null);
+  const [used, setUsed] = useState(false);
 
-function Stage({ robot, highlight }: { robot: Robot; highlight: number | null }) {
-  const { telemetry } = robot;
-  const [resetKey, setResetKey] = useState(0);
-  const [details, setDetails] = useState(false);
+  const interact = live
+    ? {
+        onGrab: () => {
+          if (!okayed.current) {
+            void confirm('Move the real arm?', 'Keep hands clear of the joints. STOP is always at the top.').then((ok) => {
+              okayed.current = ok;
+            });
+            return false;
+          }
+          goal.current = telemetry.mode === 'drive' ? goal.current ?? telemetry.follower : telemetry.follower;
+          return true;
+        },
+        onDrag: (p: [number, number, number]) => {
+          const base = goal.current ?? telemetry.follower!;
+          const next = clampTarget(solveTip(p, base), arm!.limits, telemetry.follower!);
+          goal.current = next;
+          setUsed(true);
+          try {
+            controller.drive(next);
+          } catch (e) {
+            robot.setNotice({ kind: 'warn', text: (e as Error).message });
+          }
+        },
+        onTap: () => {
+          const base = [...(goal.current ?? telemetry.follower!)] as Joints;
+          base[GRIPPER] = base[GRIPPER] > 50 ? 0 : 100;
+          goal.current = base;
+          setUsed(true);
+          try {
+            controller.drive(clampTarget(base, arm!.limits, telemetry.follower!));
+          } catch (e) {
+            robot.setNotice({ kind: 'warn', text: (e as Error).message });
+          }
+        },
+      }
+    : undefined;
+
   return (
-    <div className="stage">
-      <div className="preview">
-        <ArmPreview
-          follower={telemetry.follower}
-          leader={telemetry.leader}
-          target={telemetry.target}
-          highlight={highlight}
-          resetKey={resetKey}
-        />
-        {!telemetry.follower && (
-          <div className="preview-empty">
-            <p>Connect a follower arm to see it here.</p>
-            <button className="btn" onClick={() => robot.startPretendFollower()}>
-              🧪 Use a pretend arm
-            </button>
-          </div>
-        )}
-        {telemetry.mode !== 'idle' && telemetry.progress > 0 && (
-          <progress className="stage-progress" max={1} value={telemetry.progress} aria-label="Progress" />
-        )}
-        <div className="preview-legend" aria-hidden="true">
-          <span>
-            <i className="swatch follower" /> Follower
-          </span>
-          {telemetry.target && (
-            <span>
-              <i className="swatch target" /> Going to
-            </span>
-          )}
-          {telemetry.leader && (
-            <span>
-              <i className="swatch leader" /> Leader
-            </span>
-          )}
+    <div className="preview">
+      <ArmPreview
+        follower={telemetry.follower}
+        leader={telemetry.leader}
+        target={telemetry.target}
+        highlight={highlight}
+        interact={interact}
+      />
+      {!telemetry.follower && (
+        <div className="preview-empty">
+          <button className="btn primary big" onClick={() => robot.startPretendFollower()}>
+            ▶ Start the pretend arm
+          </button>
         </div>
-        <button className="btn small reset-view" onClick={() => setResetKey((k) => k + 1)} aria-label="Reset the 3D view">
-          ⟲
-        </button>
-      </div>
-      <button className="btn link" aria-expanded={details} onClick={() => setDetails((d) => !d)}>
-        {details ? 'Hide' : 'Show'} joint numbers
-      </button>
-      {details && (
-        <>
-          <div className="grid2">
-            <JointReadout title="🎮 Leader" joints={telemetry.leader} />
-            <JointReadout title="🤖 Follower" joints={telemetry.follower} />
-          </div>
-          {(telemetry.leader || telemetry.follower) && (
-            <p className="hint">Updating {Math.round(telemetry.hz)} times a second</p>
-          )}
-        </>
+      )}
+      {live && !used && <p className="s-hint">👆 Drag the glowing ball to move the arm. Tap it to open or close the hand.</p>}
+      {telemetry.mode !== 'idle' && telemetry.progress > 0 && (
+        <progress className="stage-progress" max={1} value={telemetry.progress} aria-label="Progress" />
       )}
     </div>
   );
