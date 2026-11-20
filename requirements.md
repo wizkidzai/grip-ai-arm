@@ -125,7 +125,7 @@ Lets Ms. Nova say "Please close the YouTube tab" during a class. A web page can'
 
 ## 8. Privacy and safety requirements (the app is for kids)
 
-- No accounts, ads, tracking or analytics. Demos, brains, calibrations and progress stay in the browser on that computer
+- No accounts, ads or cookies. The only analytics is visit counting with GoatCounter (site `wizkidz-grip-ai-arm`, `web/public/analytics.js`): no cookies, no saved IP addresses, only the page address is sent, and never anything a kid types. The dashboard is a secret view-only link held by a grown-up; the token is never put in the repo. This is described in `web/public/privacy.html`, linked from ⚙️ Settings. Demos, brains, calibrations and progress stay in the browser on that computer
   (`localStorage`) and can be deleted in ⚙️ Settings.
 - The camera is off until switched on and the video is never saved or sent.
 - The AI teacher needs a grown-up's permission once, removes personal details before the AI sees them, stays on
