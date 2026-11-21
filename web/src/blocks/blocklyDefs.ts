@@ -307,11 +307,11 @@ export function makeTheme(dark: boolean) {
     fontStyle: { family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', weight: '600', size: 13 },
     componentStyles: dark
       ? {
-          workspaceBackgroundColour: '#1b1a26',
-          toolboxBackgroundColour: '#24222f',
-          toolboxForegroundColour: '#f1effa',
-          flyoutBackgroundColour: '#2c2a3a',
-          flyoutForegroundColour: '#f1effa',
+          workspaceBackgroundColour: '#10120e',
+          toolboxBackgroundColour: '#191c16',
+          toolboxForegroundColour: '#f0f1e9',
+          flyoutBackgroundColour: '#20241b',
+          flyoutForegroundColour: '#f0f1e9',
           flyoutOpacity: 0.95,
           scrollbarColour: '#5a5670',
           insertionMarkerColour: '#ffffff',
