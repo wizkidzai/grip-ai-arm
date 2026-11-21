@@ -58,7 +58,7 @@ export default function CodePanel({
   useEffect(() => {
     if (!host.current) return;
     defineBlocks();
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = true; // app is dark-only (FLL-70511 theme)
     const workspace = Blockly.inject(host.current, {
       toolbox: TOOLBOX,
       renderer: 'zelos',
@@ -67,7 +67,7 @@ export default function CodePanel({
       sounds: false,
       zoom: { controls: true, wheel: false, startScale: 0.85, maxScale: 2, minScale: 0.4, pinch: true },
       move: { scrollbars: true, drag: true, wheel: true },
-      grid: { spacing: 24, length: 2, colour: dark ? '#333044' : '#e3e0ef', snap: true },
+      grid: { spacing: 24, length: 2, colour: dark ? '#2a2f24' : '#e3e0ef', snap: true },
     });
     ws.current = workspace;
     const keyboardNav = new KeyboardNavigation(workspace);
